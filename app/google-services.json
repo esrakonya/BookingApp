@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "450852241018",
+    "project_id": "composebooking",
+    "storage_bucket": "composebooking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:450852241018:android:5137b4cada640fe8b485c3",
+        "android_client_info": {
+          "package_name": "com.stellarforge.composebooking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDL5Mtqfn5e5ohUjfM93X2XrzuV7dEWIhg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

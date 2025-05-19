@@ -1,0 +1,108 @@
+<resources>
+    <string name="app_name">ComposeBooking</string>
+
+    <!-- Genel Hata Mesajları -->
+    <string name="error_generic_unknown">An unknown error occurred.</string>
+    <string name="error_loading_data">Failed to load data.</string>
+    <string name="error_network_connection">Please check your internet connection.</string> <!-- Belki ileride kullanılır -->
+
+    <!-- ServiceListScreen -->
+    <string name="service_list_title">Available Services</string> <!-- Ekran başlığı (TopAppBar eklersek) -->
+    <string name="service_list_loading">Loading services...</string>
+    <string name="service_list_no_services">No services available at the moment.</string>
+    <string name="service_list_error_prefix">Error:</string> <!-- UI'da "Error: {mesaj}" için -->
+    <!-- service_list_error_generic yukarıda tanımlı -->
+    <string name="service_list_item_duration">Duration: %1$d min</string> <!-- Sadece süre -->
+    <string name="service_list_item_price">Price: %1$.2f ₺</string> <!-- Sadece fiyat (para birimi simgesi?) -->
+    <string name="service_list_item_duration_price_separator"> - </string> <!-- Süre ve fiyat arası -->
+
+    <!-- BookingScreen -->
+    <string name="booking_screen_title_default">Book Appointment</string>
+    <string name="booking_screen_title_with_service">Book: %1$s</string> <!-- Servis adı gelince -->
+    <string name="booking_screen_loading_service">Loading service details...</string>
+    <string name="booking_screen_service_label">Service:</string>
+    <string name="booking_screen_duration_label">Duration:</string>
+    <string name="booking_screen_duration_value">%1$d min</string>
+    <string name="booking_screen_select_date_button">Select Date</string>
+    <string name="booking_screen_selected_date_label">Selected Date:</string>
+    <string name="booking_screen_select_time_label">Select Time Slot:</string>
+    <string name="booking_screen_loading_slots">Loading available slots...</string>
+    <string name="booking_screen_no_slots">No available slots for this date. Please select another date.</string>
+    <string name="booking_screen_select_service_prompt">Service details needed to find slots.</string>
+    <string name="booking_screen_selected_slot_label">Selected Slot:</string>
+    <string name="booking_screen_name_label">Your Name</string>
+    <string name="booking_screen_phone_label">Phone Number</string>
+    <string name="booking_screen_email_label">Email (Optional)</string>
+    <string name="booking_screen_confirm_button">Confirm Booking</string>
+    <string name="booking_screen_booking_in_progress">Booking...</string> <!-- Buton içindeki yükleme durumu -->
+    <string name="booking_screen_back_button_desc">Back</string> <!-- İçerik Açıklaması -->
+
+    <!-- BookingScreen - Hata Mesajları -->
+    <string name="error_service_id_missing">Service information is missing. Please go back and select a service.</string>
+    <string name="error_loading_service_details">Failed to load service details.</string>
+    <string name="error_loading_slots">Failed to load available time slots.</string>
+    <string name="error_name_empty">Name cannot be empty.</string>
+    <string name="error_phone_empty">Phone number cannot be empty.</string>
+    <string name="error_phone_digits">Phone number must contain only digits.</string>
+    <string name="error_phone_short">Phone number seems too short (min. 10 digits recommended).</string> <!-- Daha açıklayıcı -->
+    <string name="error_slot_missing">Please select a time slot to continue.</string>
+    <string name="error_booking_failed">Could not complete booking. Please try again later.</string>
+    <string name="error_invalid_datetime">Invalid date/time format selected.</string> <!-- UseCase'den gelebilir -->
+    <string name="error_service_duration_not_available">Service duration not available.</string>
+    <string name="error_booking_generic_problem">Cannot proceed with booking. Please check details.</string>
+
+    <!-- BookingConfirmationScreen -->
+    <string name="confirmation_icon_desc">Booking Confirmed</string> <!-- İçerik Açıklaması -->
+    <string name="confirmation_title">Appointment Booked!</string> <!-- Biraz daha kısa -->
+    <string name="confirmation_message">Your appointment has been successfully scheduled. You might receive a confirmation message shortly.</string> <!-- Biraz daha genele uygun -->
+    <string name="confirmation_home_button">Done</string> <!-- Back to Home yerine -->
+
+    <!-- DatePicker Dialog -->
+    <string name="date_picker_ok">OK</string>
+    <string name="date_picker_cancel">Cancel</string>
+    <string name="date_picker_title">Select Date</string> <!-- Dialog başlığı (kullanırsak) -->
+
+    <string name="retry_button_label">Retry</string>
+
+    <string name="login_title">Login</string>
+    <string name="auth_email_label">Email</string>
+    <string name="auth_password_label">Password</string>
+    <string name="login_button_text">Login</string>
+    <string name="login_navigate_to_signup_text">Don\'t have an account? Sign Up</string>
+    <string name="signup_title">Sign Up</string>
+    <string name="back_button_desc">Back</string>
+    <string name="auth_confirm_password_label">Confirm Password</string>
+    <string name="signup_button_text">Sign Up</string>
+
+    <!-- Auth Hata Mesajları (ViewModel'da kullanılacak ID'ler) -->
+    <string name="error_email_empty">Email cannot be empty.</string>
+    <string name="error_email_invalid">Please enter a valid email address.</string>
+    <string name="error_password_empty">Password cannot be empty.</string>
+    <string name="error_password_short">Password must be at least 6 characters long.</string>
+    <string name="error_password_mismatch">Passwords do not match.</string>
+    <string name="error_auth_invalid_credentials">Invalid email or password.</string>
+    <string name="error_auth_email_collision">This email address is already in use.</string>
+    <string name="error_auth_weak_password">Password is too weak.</string>
+    <string name="error_signup_failed">Could not create account. Please try again.</string>
+    <string name="error_login_failed">Could not sign in. Please try again.</string>
+    <string name="error_auth_user_not_found">Could not verify user. Please sign in again.</string>
+    <string name="sign_out_button_desc">Sign Out</string>
+
+    <string name="view_details_desc">View details</string>
+    <string name="booking_screen_section_service_details_title">Service Details</string>
+    <string name="booking_screen_duration_value_detailed">Duration: %1$d minutes</string>
+    <string name="booking_screen_section_datetime_title">Choose Date and Time</string>
+    <string name="booking_screen_change_date_button">Change Date</string>
+    <string name="booking_screen_selected_slot_display">Selected: %1$s</string>
+    <string name="booking_screen_section_customer_info_title">Your Information</string>
+
+    <string name="auth_show_password_desc">Show password</string>
+    <string name="auth_hide_password_desc">Hide password</string>
+    <string name="signup_subtitle">Create your account</string>
+    <string name="error_phone_too_short">Error! Phone number too short.</string>
+    <string name="error_phone_too_long">Error! Phone number too long.</string>
+    <string name="error_auth_user_not_found_for_services">Please sign in to view services.</string>
+    <string name="error_auth_token_error_for_services">Authentication error. Please try signing in again.</string>
+    <string name="error_auth_permission_denied_services">Error auth permission denied services</string>
+
+</resources>
