@@ -28,6 +28,10 @@ fun ServiceListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val eventFlow = viewModel.eventFlow
 
+    LaunchedEffect(Unit) {
+        viewModel.loadServices()
+    }
+
     LaunchedEffect(key1 = eventFlow) {
         eventFlow.collect { event ->
             when (event) {

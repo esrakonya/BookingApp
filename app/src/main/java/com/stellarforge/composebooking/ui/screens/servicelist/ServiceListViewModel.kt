@@ -21,8 +21,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.retry
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -51,18 +53,13 @@ class ServiceListViewModel @Inject constructor(
     private val _eventFlow = MutableSharedFlow<ServiceListViewEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
 
-    // ViewModel oluşturulduğunda servisleri yüklemeye başla
-    init {
-        Timber.d("ServiceListViewModel initialized.")
-        loadServices()
-    }
-
-    private fun loadServices() {
+    fun loadServices() {
         viewModelScope.launch {
             _uiState.value = ServiceListUiState.Loading
             Timber.d("ServiceListViewModel: Attempting to load services...")
 
             val user = firebaseAuth.currentUser
+            Timber.d("AUTH_CHECK", "UID: ${user?.uid}, Email: ${user?.email}")
             if (user == null) {
                 Timber.e("ServiceListViewModel: User is null before loading services.")
                 _uiState.value = ServiceListUiState.Error(R.string.error_auth_user_not_found_for_services)
@@ -71,7 +68,8 @@ class ServiceListViewModel @Inject constructor(
 
             Timber.d("ServiceListViewModel: User found (UID: ${user.uid}). Verifying ID token for service loading.")
 
-            val token = user.getIdToken(true)
+            val tokenResult = user.getIdToken(true).await()
+            val token = tokenResult.token
             if (token == null) {
                 Timber.e("ServiceListViewModel: Failed to get token before loading services.")
                 _uiState.value = ServiceListUiState.Error(R.string.error_auth_token_error_for_services)
@@ -81,19 +79,28 @@ class ServiceListViewModel @Inject constructor(
             Timber.d("ServiceListViewModel: Token confirmed. Proceeding with getServices.")
 
             repository.getServices()
-                .retry(retries = 1) { cause ->
-                    if (cause is FirebaseFirestoreException && cause.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                        Timber.w(cause, "Permission denied on attempt. Retrying in 300ms...")
-                        delay(300)
-                        return@retry true
+                .retryWhen { cause, attempt -> // attempt 0'dan başlar (ilk deneme başarısız olduğunda)
+                    Timber.d("retryWhen: attempt=$attempt, Cause type=${cause::class.simpleName}, Msg=${cause.message}")
+                    if (attempt < 1 && cause is FirebaseFirestoreException) { // Max 1 retry (yani attempt 0 iken)
+                        val triggerMessageForRetry = "PERMISSION_DENIED_RETRY_TRIGGER"
+                        if (cause.message?.contains(triggerMessageForRetry, ignoreCase = true) == true) {
+                            Timber.w(cause, "retryWhen: Message matches. Delaying 300ms for retry.")
+                            delay(300)
+                            return@retryWhen true // Retry yap
+                        } else {
+                            Timber.d("retryWhen: Message does not match or not Firestore exc. Not retrying.")
+                            return@retryWhen false // Retry yapma
+                        }
                     }
-                    return@retry false
+                    Timber.d("retryWhen: Max attempts reached or cause not applicable. Not retrying.")
+                    return@retryWhen false // Max retry sayısını aştıysak veya koşul uymuyorsa retry yapma
                 }
                 .catch { exception ->
                     Timber.e(exception, "Exception in getServices Flow stream (after token check and retries).")
                     _uiState.value = ServiceListUiState.Error(R.string.error_loading_data)
                 }
                 .collect { result ->
+                    Timber.d("VM Collect [test: retry succeeds]: Result isSuccess=${result.isSuccess}, exception=${result.exceptionOrNull()}, services=${if(result.isSuccess) result.getOrNull() else "N/A"}")
                     if (result.isSuccess) {
                         val services = result.getOrDefault(emptyList())
                         Timber.d("ServiceListViewModel: Successfully loaded ${services.size} services.")
