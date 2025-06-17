@@ -5,6 +5,7 @@ import com.stellarforge.composebooking.data.model.Service
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import com.google.firebase.firestore.DocumentReference
+import com.stellarforge.composebooking.utils.Result
 
 /**
  * Randevu ve Servis verileriyle ilgili işlemleri tanımlayan arayüz.

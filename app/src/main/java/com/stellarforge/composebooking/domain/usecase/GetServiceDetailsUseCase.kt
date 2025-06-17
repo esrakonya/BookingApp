@@ -2,6 +2,7 @@ package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.data.repository.AppointmentRepository
+import com.stellarforge.composebooking.utils.Result
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -15,7 +16,7 @@ class GetServiceDetailsUseCase @Inject constructor(
             // Eğer repository.getServiceDetails kendisi bir exception fırlatırsa
             // (Normalde Result döndürmeli ama garantiye alalım)
             Timber.e("GerServiceDetailsUseCase: Caught unexpected exception: ${e.message}")
-            Result.failure(e) // Hatayı Result.failure olarak döndür
+            Result.Error(e) // Hatayı Result.failure olarak döndür
         }
     }
 }

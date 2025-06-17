@@ -2,7 +2,6 @@ package com.stellarforge.composebooking.data.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.PropertyName
-import java.util.Date
 
 // Firestore'daki 'appointments' koleksiyonundaki belgeleri temsil edecek data class
 data class Appointment (

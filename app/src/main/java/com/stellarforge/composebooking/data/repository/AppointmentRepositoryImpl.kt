@@ -1,16 +1,15 @@
 package com.stellarforge.composebooking.data.repository
 
-import android.util.Log
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.data.remote.AppointmentRemoteDataSource
 import com.stellarforge.composebooking.data.remote.ServiceRemoteDataSource
+import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.di.IoDispatcher
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
@@ -31,7 +30,7 @@ class AppointmentRepositoryImpl @Inject constructor(
         return serviceDataSource.getServicesFlow()
             .catch { e ->
                 Timber.e(e, "Error fetching services flow in Repository")
-                emit(Result.failure(Exception("Repository: Error fetching services", e)))
+                emit(Result.Error(Exception("Repository: Error fetching services", e)))
             }.flowOn(ioDispatcher)
     }
 

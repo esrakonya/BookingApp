@@ -16,6 +16,7 @@ import com.stellarforge.composebooking.ui.screens.auth.SignUpScreen
 import com.stellarforge.composebooking.ui.screens.servicelist.ServiceListScreen
 import com.stellarforge.composebooking.ui.screens.confirmation.BookingConfirmationScreen
 import com.stellarforge.composebooking.ui.screens.booking.BookingScreen
+import com.stellarforge.composebooking.ui.screens.businessprofile.BusinessProfileScreen
 import com.stellarforge.composebooking.ui.screens.splash.SplashScreen
 import com.stellarforge.composebooking.ui.screens.splash.SplashViewModel
 import timber.log.Timber
@@ -86,18 +87,10 @@ fun AppNavigation(navController: NavHostController) {
             // Bu rota çağrıldığında ServiceListScreen Composable'ını göster
             ServiceListScreen(
                 // ViewModel zaten Hilt tarafından sağlanacak (Composable içinde)
+                navController = navController,
                 onServiceClick = { serviceId ->
                     // Rezervasyon ekranına git
                     navController.navigate(ScreenRoutes.BookingScreen.createRoute(serviceId))
-                },
-                onNavigateToLogin = {
-                    // Oturum kapatıldığında Login'e git ve tüm geri yığınını temizle
-                    navController.navigate(ScreenRoutes.Login.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            inclusive = true // Splash dahil tüm stack'i temizle
-                        }
-                        launchSingleTop = true
-                    }
                 }
             )
         }
@@ -147,6 +140,8 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
-        // Diğer ekranlar buraya eklenebilir...
+        composable(route = ScreenRoutes.BusinessProfile.route) {
+            BusinessProfileScreen(navController = navController)
+        }
     }
 }

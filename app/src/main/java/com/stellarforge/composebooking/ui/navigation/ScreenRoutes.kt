@@ -14,4 +14,6 @@ sealed class ScreenRoutes(val route: String) {
     object BookingConfirmation : ScreenRoutes("booking_confirmation")
 
     object Splash : ScreenRoutes("splash")
+
+    object BusinessProfile : ScreenRoutes("business_profile_screen")
 }

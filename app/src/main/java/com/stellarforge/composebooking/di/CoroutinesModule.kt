@@ -22,11 +22,4 @@ object CoroutinesModule {
     @DefaultDispatcher
     fun provideDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
 
-    // Main dispatcher genellikle doğrudan enjekte edilmez,
-    // viewModelScope gibi yapılar onu kullanır veya testlerde Rule ile değiştirilir.
-    // Ama gerekirse sağlanabilir:
-    // @Provides
-    // @Singleton
-    // @MainDispatcher
-    // fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
 }

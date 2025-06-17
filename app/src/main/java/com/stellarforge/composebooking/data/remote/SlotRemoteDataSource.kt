@@ -7,6 +7,7 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.toObjects
 import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.utils.FirebaseConstants
+import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.time.ZoneId
@@ -26,9 +27,9 @@ class SlotRemoteDataSource @Inject constructor(
     suspend fun addSlot(slot: BookedSlot): Result<Unit> {
         return try {
             slotsCollection.add(slot).await()
-            Result.success(Unit)
+            Result.Success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 
@@ -59,9 +60,9 @@ class SlotRemoteDataSource @Inject constructor(
 
             val slots = snapshot.toObjects<BookedSlot>()
             // ID atamaya gerek yok, sadece zaman bilgisi lazım.
-            Result.success(slots)
+            Result.Success(slots)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 
@@ -78,9 +79,9 @@ class SlotRemoteDataSource @Inject constructor(
                     document.reference.delete().await()
                 }
             }
-            Result.success(Unit)
+            Result.Success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 

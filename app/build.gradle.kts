@@ -47,10 +47,6 @@ android {
         compose = true
         buildConfig = true
     }
-    // Kotlin 2.x ve Compose Compiler Plugin varken BU BLOK ARTIK GEREKLİ DEĞİL
-    // composeOptions {
-    //     kotlinCompilerExtensionVersion = "..." // <-- SİLİNDİ
-    // }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

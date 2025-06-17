@@ -2,13 +2,11 @@ package com.stellarforge.composebooking.data.remote
 
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.utils.FirebaseConstants
+import com.stellarforge.composebooking.utils.Result
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.firestore.ktx.toObjects
-import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.time.LocalTime
@@ -62,9 +60,9 @@ class AppointmentRemoteDataSource @Inject constructor(
                 }
             }
 
-            Result.success(appointments)
+            Result.Success(appointments)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 
@@ -80,18 +78,18 @@ class AppointmentRemoteDataSource @Inject constructor(
             // appointments koleksiyonuna yeni bir belge (randevu) ekle.
             // add() metodu otomatik olarak benzersiz bir ID oluşturur.
             appointmentsCollection.add(appointment).await()
-            Result.success(Unit)
+            Result.Success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 
     suspend fun createAppointmentWithId(ref: DocumentReference, appointment: Appointment): Result<Unit> {
         return try {
             ref.set(appointment).await()
-            Result.success(Unit)
+            Result.Success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 }

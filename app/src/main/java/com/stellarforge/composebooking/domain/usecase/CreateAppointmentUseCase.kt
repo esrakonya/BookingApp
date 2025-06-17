@@ -5,6 +5,8 @@ import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.data.repository.AppointmentRepository
 import com.stellarforge.composebooking.data.repository.SlotRepository
+import com.stellarforge.composebooking.utils.onError
+import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import java.time.LocalDate
@@ -30,13 +32,19 @@ class CreateAppointmentUseCase @Inject constructor(
     ): Result<Unit> {
 
         if (userId.isBlank()) {
-            return Result.failure(IllegalArgumentException("User ID cannot be blank."))
+            val exception = IllegalArgumentException("User ID cannot be blank.")
+            Timber.w(exception)
+            return Result.Error(exception)
         }
         if (serviceId.isBlank()) {
-            return Result.failure(IllegalArgumentException("Service ID cannot be blank."))
+            val exception = IllegalArgumentException("Service ID cannot be blank.")
+            Timber.w(exception)
+            return Result.Error(exception)
         }
         if (customerName.isBlank() || customerPhone.isBlank()) {
-            return Result.failure(IllegalArgumentException("Customer name and phone cannot be empty."))
+            val exception = IllegalArgumentException("Customer name and phone cannot be empty.")
+            Timber.w(exception)
+            return Result.Error(exception)
         }
 
         val startLocalDateTime = LocalDateTime.of(date, time)
@@ -53,14 +61,14 @@ class CreateAppointmentUseCase @Inject constructor(
             endTimestamp = Timestamp(endInstant.epochSecond, endInstant.nano)
         } catch (e: Exception) {
             Timber.e(e, "Error creating timestamps from Instant")
-            return Result.failure(Exception("Invalid date/time format when creating Timestamps.", e))
+            return Result.Error(Exception("Invalid date/time format when creating Timestamps.", e))
         }
 
         val newAppointmentRef = try {
             appointmentRepository.getNewAppointmentReference()
         } catch (e: Exception) {
             Timber.e(e, "Error getting new appointment reference")
-            return Result.failure(Exception("Failed to get appointment reference", e))
+            return Result.Error(Exception("Failed to get appointment reference", e))
         }
         val newAppointmentId = newAppointmentRef.id
 
@@ -88,17 +96,17 @@ class CreateAppointmentUseCase @Inject constructor(
             Timber.d("Attempting to write appointment $newAppointmentId")
             val appointmentResult = appointmentRepository.createAppointmentWithId(newAppointmentRef, newAppointment)
 
-            if (appointmentResult.isFailure) {
-                Timber.e(appointmentResult.exceptionOrNull(), "Failed to write appointment $newAppointmentId. Slot write will not be attempted.")
-                return Result.failure(appointmentResult.exceptionOrNull() ?: Exception("Failed to create appointment record"))
+            if (appointmentResult is Result.Error) {
+                Timber.e(appointmentResult.exception, "Failed to write appointment $newAppointmentId. Slot write will not be attempted.")
+                return Result.Error(appointmentResult.exception, appointmentResult.message ?: "Failed to create appointment record")
             }
 
             // 2. Appointment başarılıysa, Slot'u yaz
             Timber.d("Appointment write successful for $newAppointmentId. Attempting to write slot.")
             val slotResult = slotRepository.addSlot(newSlot)
 
-            if (slotResult.isFailure) {
-                Timber.e(slotResult.exceptionOrNull(), "Failed to write slot for appointment $newAppointmentId after successful appointment write.")
+            if (slotResult is Result.Error) {
+                Timber.e(slotResult.exception, "Failed to write slot for appointment $newAppointmentId after successful appointment write.")
                 // --- İDEALDE GERİ ALMA (ROLLBACK) ---
                 // Bu noktada, başarılı bir şekilde yazılmış olan newAppointment'ı silmek gerekir.
                 // Bu, bir Firestore transaction içinde yapılabilir veya "best-effort" silme denenebilir.
@@ -111,12 +119,12 @@ class CreateAppointmentUseCase @Inject constructor(
                 // if (deleteResult.isFailure) {
                 //    Timber.e(deleteResult.exceptionOrNull(), "Critical error: Failed to delete appointment $newAppointmentId after slot write failure. Data inconsistency.")
                 // }
-                return Result.failure(slotResult.exceptionOrNull() ?: Exception("Failed to write slot. Appointment was created but slot booking failed."))
+                return Result.Error(slotResult.exception ?: Exception("Failed to write slot. Appointment was created but slot booking failed."))
             }
 
             // Her ikisi de başarılı
             Timber.d("Successfully wrote appointment and slot for $newAppointmentId")
-            return Result.success(Unit)
+            return Result.Success(Unit)
 
         } catch (e: CancellationException) {
             Timber.w(e, "Create appointment/slot was cancelled for $newAppointmentId")
@@ -126,7 +134,7 @@ class CreateAppointmentUseCase @Inject constructor(
             // beklenmedik diğer hataları yakalar. Repository çağrılarından dönen
             // Result.failure'lar yukarıda zaten ele alınıyor.
             Timber.e(e, "Unexpected error during create appointment process after initial validations for potential ID $newAppointmentId")
-            return Result.failure(Exception("An unexpected error occurred during booking.", e))
+            return Result.Error(Exception("An unexpected error occurred during booking.", e))
         }
     }
 }

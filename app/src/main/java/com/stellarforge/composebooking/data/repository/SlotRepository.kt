@@ -1,6 +1,7 @@
 package com.stellarforge.composebooking.data.repository
 
 import com.stellarforge.composebooking.data.model.BookedSlot
+import com.stellarforge.composebooking.utils.Result
 import java.time.LocalDate
 
 interface SlotRepository {

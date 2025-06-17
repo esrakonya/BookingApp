@@ -7,6 +7,8 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.stellarforge.composebooking.data.repository.AuthRepository
 import com.stellarforge.composebooking.data.repository.AuthRepositoryImpl
+import com.stellarforge.composebooking.data.repository.BusinessProfileRepository
+import com.stellarforge.composebooking.data.repository.BusinessProfileRepositoryImpl
 import com.stellarforge.composebooking.data.repository.SlotRepository
 import com.stellarforge.composebooking.data.repository.SlotRepositoryImpl
 import dagger.Binds
@@ -38,5 +40,11 @@ abstract class RepositoryModule {
     abstract fun bindSlotRepository(
         slotRepositoryImpl: SlotRepositoryImpl
     ) : SlotRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBusinessProfileRepository(
+        businessProfileRepositoryImpl: BusinessProfileRepositoryImpl
+    ) : BusinessProfileRepository
 }
 

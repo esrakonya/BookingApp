@@ -4,7 +4,7 @@ import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.data.remote.SlotRemoteDataSource
 import com.stellarforge.composebooking.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import javax.inject.Inject

@@ -104,5 +104,27 @@
     <string name="error_auth_user_not_found_for_services">Please sign in to view services.</string>
     <string name="error_auth_token_error_for_services">Authentication error. Please try signing in again.</string>
     <string name="error_auth_permission_denied_services">Error auth permission denied services</string>
+    <string name="error_auth_generic_signup">Error auth generic signup</string>
+    <string name="error_confirm_password_empty">Error confirm password empty</string>
+
+    <string name="screen_title_business_profile">İşletme Profili</string>
+    <string name="cd_navigate_up">Geri dön</string>
+    <string name="label_business_name">İşletme Adı</string>
+    <string name="label_contact_email">İletişim E-postası</string>
+    <string name="label_contact_phone">İletişim Telefonu</string>
+    <string name="label_address">Adres</string>
+    <string name="label_logo_url_optional">Logo URL (Opsiyonel)</string>
+    <string name="button_save_profile">Profili Kaydet</string>
+
+    <string name="error_service_not_found">Seçilen servis bulunamadı veya yüklenemedi.</string>
+    <string name="booking_success">Randevunuz başarıyla oluşturuldu!</string>
+    <string name="error_phone_invalid">Error phone invalid</string>
+    <string name="error_phone_length">Telefon numarası 10 veya 11 haneli olmalıdır.</string>
+    <string name="error_sign_out_failed">Error sign out failed</string>
+    <string name="error_network_connection_firestore">Error network connection firestore</string>
+    <string name="error_loading_data_firestore">Error loading data firestore</string>
+    <string name="error_auth_generic">Error auth generic</string>
+    <string name="service_list_empty">Service list empty</string>
+    <string name="action_edit_business_profile">İşletme Profilini Düzenle</string>
 
 </resources>

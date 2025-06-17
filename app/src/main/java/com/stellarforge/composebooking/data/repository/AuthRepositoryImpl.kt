@@ -2,6 +2,7 @@ package com.stellarforge.composebooking.data.repository
 
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.remote.AuthRemoteDataSource
+import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext

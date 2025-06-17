@@ -2,6 +2,7 @@ package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.repository.AuthRepository
+import com.stellarforge.composebooking.utils.Result
 import javax.inject.Inject
 
 /**
@@ -20,7 +21,7 @@ class SignUpUseCase @Inject constructor(
     suspend operator fun invoke(email: String, password: String): Result<AuthUser> {
         // Temel format validasyonu ve şifre gücü kontrolü burada yapılabilir.
         if (email.isBlank() || password.isBlank()) {
-            return Result.failure(IllegalArgumentException("Email or password cannot be blank."))
+            return Result.Error(IllegalArgumentException("Email or password cannot be blank."))
         }
 
         return authRepository.signUpWithEmailPassword(email, password)

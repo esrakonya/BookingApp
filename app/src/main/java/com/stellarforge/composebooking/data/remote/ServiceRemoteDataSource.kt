@@ -3,11 +3,9 @@ package com.stellarforge.composebooking.data.remote
 import com.stellarforge.composebooking.data.model.Service
 import com.google.firebase.firestore.CollectionReference
 import com.stellarforge.composebooking.utils.FirebaseConstants
+import com.stellarforge.composebooking.utils.Result
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.firestore.ktx.toObjects
 import com.google.firebase.firestore.toObject
-import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -41,7 +39,7 @@ class ServiceRemoteDataSource @Inject constructor(
             .orderBy("name")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(Result.failure(error))
+                    trySend(Result.Error(error))
                     close(error)
                     return@addSnapshotListener
                 }
@@ -55,12 +53,12 @@ class ServiceRemoteDataSource @Inject constructor(
                                 services[index].id = document.id
                             }
                         }
-                        trySend(Result.success(services))
+                        trySend(Result.Success(services))
                     } catch (e: Exception) {
-                        trySend(Result.failure(e))
+                        trySend(Result.Error(e))
                     }
                 } else {
-                    trySend(Result.success(emptyList()))
+                    trySend(Result.Success(emptyList()))
                 }
             }
         awaitClose {
@@ -83,14 +81,14 @@ class ServiceRemoteDataSource @Inject constructor(
             }
 
             if (service != null) {
-                Result.success(service) // Başarılı olursa servisi döndür
+                Result.Success(service) // Başarılı olursa servisi döndür
             } else {
                 // Belge bulunamadı veya dönüştürülemedi
-                Result.failure(Exception("Service with ID $serviceId not found or could not be parsed."))
+                Result.Error(Exception("Service with ID $serviceId not found or could not be parsed."))
             }
         } catch (e: Exception) {
             // Firestore işlemi sırasında hata oluşursa
-            Result.failure(e)
+            Result.Error(e)
         }
     }
 }
