@@ -127,4 +127,12 @@
     <string name="service_list_empty">Service list empty</string>
     <string name="action_edit_business_profile">İşletme Profilini Düzenle</string>
 
+    <string name="action_navigate_back">Geri Git</string>
+    <string name="header_contact_info">İletişim Bilgileri</string>
+    <string name="header_other_info">Diğer Bilgiler</string>
+    <string name="label_business_name_required">İşletme Adı*</string>
+    <string name="header_business_profile_edit">İşletme Bilgilerini Düzenle</string>
+    <string name="header_location_info">Konum Bilgileri</string>
+    <string name="header_basic_info">Temel Bilgiler</string>
+
 </resources>

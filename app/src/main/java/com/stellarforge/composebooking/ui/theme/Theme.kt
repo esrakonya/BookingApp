@@ -9,35 +9,59 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
+// Koyu tema için özel renk şemamız
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = PrimaryContainerBlue, // Karanlık temada ana renk daha açık ve soluk olabilir
+    onPrimary = OnPrimaryContainerBlue,
+    primaryContainer = PrimaryBlue,
+    onPrimaryContainer = OnPrimaryBlue,
+    secondary = SecondaryContainerGrey,
+    onSecondary = OnSecondaryContainerGrey,
+    background = BackgroundDark,
+    onBackground = OnBackgroundDark,
+    surface = SurfaceDark,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    error = ErrorRed,
+    onError = OnErrorRed,
+    outline = OutlineDark
 )
 
+// Açık tema için özel renk şemamız
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = PrimaryBlue,
+    onPrimary = OnPrimaryBlue,
+    primaryContainer = PrimaryContainerBlue,
+    onPrimaryContainer = OnPrimaryContainerBlue,
+    secondary = SecondaryGrey,
+    onSecondary = OnSecondaryGrey,
+    secondaryContainer = SecondaryContainerGrey,
+    onSecondaryContainer = OnSecondaryContainerGrey,
+    background = BackgroundLight,
+    onBackground = OnBackgroundLight,
+    surface = SurfaceLight,
+    onSurface = OnSurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    error = ErrorRed,
+    onError = OnErrorRed,
+    outline = OutlineLight
 )
 
 @Composable
 fun ComposeBookingTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Dinamik renk (Android 12+), duvar kağıdından renk almayı sağlar.
+    // Şablonun markalaşması için bunu 'false' yapmak, her zaman kendi renklerinizi kullanmanızı sağlar.
+    // 'true' bırakmak ise kullanıcıya daha kişisel bir deneyim sunar. Bu bir tasarım kararıdır.
+    dynamicColor: Boolean = false, // Şimdilik false yapalım ki kendi renklerimizi görelim
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -50,9 +74,20 @@ fun ComposeBookingTheme(
         else -> LightColorScheme
     }
 
+    // Status bar (en üstteki saat, pil ikonu olan bar) rengini temaya uygun hale getirelim.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = colorScheme.primary.toArgb() // Status bar rengini ana renge ayarla
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+        }
+    }
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = Typography, // Type.kt'den gelen tipografi ölçeği
+        // shapes = AppShapes, // Eğer özel şekillerin varsa (Shapes.kt)
         content = content
     )
 }

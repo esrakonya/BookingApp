@@ -1,23 +1,36 @@
 package com.stellarforge.composebooking.data.model
 
 import com.google.firebase.firestore.PropertyName
+import com.google.firebase.firestore.ServerTimestamp
+import java.util.Date
 
 data class Service (
-    var id: String = "",
+    val id: String = "",
 
-    @get:PropertyName("name") @set:PropertyName("name")
-    var name: String = "",
+    @get:PropertyName("ownerId")
+    val ownerId: String = "",
 
-    @get:PropertyName("description") @set:PropertyName("description")
-    var description: String = "",
+    @get:PropertyName("name")
+    val name: String = "",
 
-    @get:PropertyName("durationMinutes") @set:PropertyName("durationMinutes")
-    var durationMinutes: Int = 30,
+    @get:PropertyName("description")
+    val description: String = "",
 
-    @get:PropertyName("price") @set:PropertyName("price")
-    var price: Double = 0.0,
+    @get:PropertyName("durationMinutes")
+    val durationMinutes: Int = 30,
 
-    @get:PropertyName("isActive") @set:PropertyName("isActive")
-    var isActive: Boolean = true
+    @get:PropertyName("priceInCents")
+    val price: Long = 0L,
+
+    @get:PropertyName("isActive")
+    val isActive: Boolean = true,
+
+    @ServerTimestamp
+    @get:PropertyName("createdAt")
+    val createdAt: Date? = null,
+
+    @ServerTimestamp
+    @get:PropertyName("updatedAt")
+    val updatedAt: Date? = null
 
 )

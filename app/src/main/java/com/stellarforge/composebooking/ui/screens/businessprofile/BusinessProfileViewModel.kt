@@ -36,9 +36,6 @@ class BusinessProfileViewModel @Inject constructor(
 
     init {
         Timber.d("BusinessProfileViewModel initialized.")
-        // ViewModel başlatıldığında hemen profili yüklemeye başla
-        // ve başlangıçta yükleme durumunu true yap.
-        _uiState.update { it.copy(isLoadingProfile = true) }
         loadBusinessProfile()
     }
 
@@ -52,7 +49,68 @@ class BusinessProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             // 1. Mevcut kullanıcıyı al
-            when (val userResult = getCurrentUserUseCase()) { // Bu Result<AuthUser?> döndürür
+            val userResult = getCurrentUserUseCase()
+            if (userResult is Result.Error) {
+                Timber.w(userResult.exception, "Mevcut kullanıcı bilgisi alınamadı. Profil yüklenemiyor.")
+                _uiState.update {
+                    it.copy(
+                        isLoadingProfile = false,
+                        loadErrorMessage = "Kullanıcı bilgisi alınamadı."
+                    )
+                }
+                clearFormFields()
+                return@launch
+            }
+
+            // Kullanıcının null veya geçersiz olma durumunu kontrol et ve çık
+            val authUser = (userResult as Result.Success).data
+            if (authUser == null || authUser.uid.isBlank()) {
+                Timber.w("Kullanıcı doğrulanmamış veya UID boş. Profil yüklenemiyor.")
+                _uiState.update {
+                    it.copy(
+                        isLoadingProfile = false,
+                        loadErrorMessage = "Oturum açmış bir kullanıcı bulunamadı."
+                    )
+                }
+                clearFormFields()
+                return@launch
+            }
+
+            // Artık geçerli bir kullanıcımız var.
+            Timber.d("Current user loaded: ${authUser.uid}. Now fetching profile.")
+            getBusinessProfileUseCase(authUser.uid).collect { profileResult ->
+                when(profileResult) {
+                    is Result.Success -> {
+                        val profile = profileResult.data
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                isLoadingProfile = false,
+                                profileData = profile,
+                                loadErrorMessage = null
+                            )
+                        }
+                        updateFormFieldsFromProfile(profile)
+                        Timber.d("Profile loaded: $profile. Form fields updated.")
+                    }
+                    is Result.Error -> {
+                        Timber.e(profileResult.exception, "Error loading profile from Firestore.")
+                        _uiState.update {
+                            it.copy(
+                                isLoadingProfile = false,
+                                loadErrorMessage = "İşletme profili yüklenemedi."
+                            )
+                        }
+                        clearFormFields()
+                    }
+                    is Result.Loading -> {
+                        _uiState.update {
+                            it.copy(isLoadingProfile = true)
+                        }
+                    }
+                }
+            }
+
+            /*when (val userResult = getCurrentUserUseCase()) { // Bu Result<AuthUser?> döndürür
                 is Result.Success -> {
                     val authUser = userResult.data
                     if (authUser != null && authUser.uid.isNotBlank()) {
@@ -101,7 +159,7 @@ class BusinessProfileViewModel @Inject constructor(
                     // _uiState.isLoadingProfile zaten true olmalı. Formu temizleyebiliriz.
                     clearFormFields()
                 }
-            }
+            }*/
         }
     }
 

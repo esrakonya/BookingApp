@@ -1,12 +1,13 @@
+import com.android.build.gradle.internal.utils.isKspPluginApplied
+
 // app/build.gradle.kts
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.kapt) // Kapt kullanıyoruz
+    alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.google.services)
-    alias(libs.plugins.compose.compiler) // Compose Compiler Plugin'i uygula
 }
 
 android {
@@ -43,6 +44,9 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    composeOptions {
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -65,13 +69,14 @@ dependencies {
     // Compose (BOM ve Bundle)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.bundles.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Coroutines (Bundle)
     implementation(libs.bundles.coroutines)
 
     // Hilt
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
     // Firebase (BOM)
@@ -93,9 +98,11 @@ dependencies {
     debugImplementation(libs.bundles.debug)
 
     implementation(libs.timber)
-}
 
-// Kapt konfigürasyonu
-kapt {
-    correctErrorTypes = true
+    //implementation("androidx.compose.material:material-icons-core:1.6.7")
+    //implementation("androidx.compose.material:material-icons-extended:1.6.7")
+    implementation("com.kizitonwose.calendar:compose:2.5.2")
+
+    testImplementation ("com.google.truth:truth:1.1.3")
+
 }

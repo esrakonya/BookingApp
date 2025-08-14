@@ -2,7 +2,9 @@ package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.data.repository.AppointmentRepository
+import com.stellarforge.composebooking.utils.Result
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNotNull
@@ -39,28 +41,34 @@ class GetServiceDetailsUseCaseTest {
             isActive = true
         )
 
-        val successResult: Result<Service> = Result.success(expectedService)
+        val successResult: Result<Service> = Result.Success(expectedService)
 
         coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns successResult
 
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
-        assertTrue(actualResult.isSuccess)
-        assertEquals(expectedService, actualResult.getOrNull())
+        assertTrue("Result should be an instance of Result.Success", actualResult is Result.Success)
+        val serviceData = (actualResult as Result.Success).data
+        assertEquals(expectedService, serviceData)
+
+        coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
     }
 
     @Test
-    fun `invoke() when repository returns failure should return failure`() = runTest {
+    fun `invoke() when repository returns error should return error`() = runTest {
         val fakeServiceId = "test-id-404"
         val expectedException = Exception("Service not found in mock")
-        val failureResult: Result<Service> = Result.failure(expectedException)
+        val failureResult: Result<Service> = Result.Error(expectedException)
 
         coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns failureResult
 
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
-        assertTrue(actualResult.isFailure)
-        assertEquals(expectedException, actualResult.exceptionOrNull())
+        assertTrue("Result should be an instance of Result.Error", actualResult is Result.Error)
+        val actualException = (actualResult as Result.Error).exception
+        assertEquals(expectedException, actualException)
+
+        coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
     }
 
     @Test
@@ -72,9 +80,14 @@ class GetServiceDetailsUseCaseTest {
 
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
-        assertTrue("Result should be failure when repository throws", actualResult.isFailure)
-        assertNotNull("Exception should not be null in failure result", actualResult.exceptionOrNull())
-        assertTrue("Exception cause should be the expected RuntimeException", actualResult.exceptionOrNull() is RuntimeException)
-        assertEquals(expectedCause.message, actualResult.exceptionOrNull()?.message)
+        assertTrue("Result should be an instance of Result.Error when repository throws", actualResult is Result.Error)
+
+        val errorResult = actualResult as Result.Error
+        val wrappedException = errorResult.exception
+
+        assertNotNull("Exception should not be null in Error result", wrappedException)
+        assertEquals(expectedCause, wrappedException)
+
+        coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
     }
 }

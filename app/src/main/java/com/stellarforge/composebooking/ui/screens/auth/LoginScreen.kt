@@ -159,8 +159,18 @@ fun LoginScreen(
                             }
                         ),
                         trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Lock else Icons.Filled.Warning
-                            val description = if (passwordVisible) stringResource(R.string.auth_hide_password_desc) else stringResource(R.string.auth_show_password_desc) // strings.xml'e ekle
+                            // passwordVisible true ise, şifre görünür demektir.
+                            // Bu durumda "şifreyi gizle" ikonunu (gözü kapalı) gösteririz.
+                            val image = if (passwordVisible)
+                                Icons.Filled.Visibility
+                            else
+                                Icons.Filled.VisibilityOff
+
+                            val description = if (passwordVisible)
+                                stringResource(R.string.auth_hide_password_desc)
+                            else
+                                stringResource(R.string.auth_show_password_desc)
+
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(imageVector = image, contentDescription = description)
                             }

@@ -9,10 +9,12 @@ import com.stellarforge.composebooking.data.remote.ServiceRemoteDataSource
 import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.di.IoDispatcher
 import com.stellarforge.composebooking.utils.FirebaseConstants
+import com.stellarforge.composebooking.utils.mapOnSuccess
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.LocalDate
@@ -27,11 +29,19 @@ class AppointmentRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : AppointmentRepository {
     override fun getServices(): Flow<Result<List<Service>>> {
-        return serviceDataSource.getServicesFlow()
-            .catch { e ->
-                Timber.e(e, "Error fetching services flow in Repository")
-                emit(Result.Error(Exception("Repository: Error fetching services", e)))
-            }.flowOn(ioDispatcher)
+        // 1. Hedef işletmenin ID'sini al.
+        val targetOwnerId = FirebaseConstants.TARGET_BUSINESS_OWNER_ID
+
+        // 2. DataSource'dan gelen ve zaten Result içeren akışı dinle.
+        return serviceDataSource.getOwnerServicesStream(targetOwnerId)
+            .map { result ->
+                // 3. Gelen Result başarılı ise (Success), içindeki listeyi filtrele.
+                //    Başarısız ise (Error), ona dokunmadan aynen geçir.
+                result.mapOnSuccess { serviceList ->
+                    serviceList.filter { it.isActive }
+                }
+            }
+            .flowOn(ioDispatcher) // 4. Tüm akışın belirtilen dispatcher'da çalışmasını sağla.
     }
 
     override suspend fun getAppointmentsForDate(date: LocalDate): Result<List<Appointment>> {

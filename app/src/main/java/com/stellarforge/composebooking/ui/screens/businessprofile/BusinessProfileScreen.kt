@@ -1,46 +1,24 @@
 package com.stellarforge.composebooking.ui.screens.businessprofile
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,6 +33,7 @@ fun BusinessProfileScreen(
     navController: NavController,
     viewModel: BusinessProfileViewModel = hiltViewModel()
 ) {
+    // ViewModel'dan state'leri ve form alanlarını al
     val uiState by viewModel.uiState.collectAsState()
     val businessName by viewModel.businessName.collectAsState()
     val contactEmail by viewModel.contactEmail.collectAsState()
@@ -64,19 +43,20 @@ fun BusinessProfileScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Başarı veya hata mesajları için Snackbar gösterimini yöneten LaunchedEffect'ler
     LaunchedEffect(uiState.updateSuccessMessage) {
-        uiState.updateSuccessMessage?.let {
+        uiState.updateSuccessMessage?.let { message ->
             snackbarHostState.showSnackbar(
-                message = it,
+                message = message,
                 duration = SnackbarDuration.Short
             )
-            viewModel.clearUpdateMessages()
+            viewModel.clearUpdateMessages() // Mesaj gösterildikten sonra temizle
         }
     }
     LaunchedEffect(uiState.updateErrorMessage) {
-        uiState.updateErrorMessage?.let {
+        uiState.updateErrorMessage?.let { message ->
             snackbarHostState.showSnackbar(
-                message = it,
+                message = message,
                 duration = SnackbarDuration.Long,
                 withDismissAction = true
             )
@@ -84,120 +64,198 @@ fun BusinessProfileScreen(
         }
     }
     LaunchedEffect(uiState.loadErrorMessage) {
-        uiState.loadErrorMessage?.let {
+        uiState.loadErrorMessage?.let { message ->
             snackbarHostState.showSnackbar(
-                message = it,
+                message = message,
                 duration = SnackbarDuration.Long,
                 withDismissAction = true
             )
-            viewModel.clearUpdateMessages()
+            // Yükleme hatası mesajını temizlemek için bir mekanizma eklenebilir
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(id = R.string.booking_screen_title_default)) },
+                title = { Text(stringResource(id = R.string.screen_title_business_profile)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            Icons.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.login_navigate_to_signup_text)
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_navigate_back)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                )
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            // "Kaydet" butonu, her zaman altta ve görünür olacak şekilde
+            Surface(tonalElevation = 4.dp, shadowElevation = 4.dp) {
+                Button(
+                    onClick = { viewModel.saveBusinessProfile() },
+                    enabled = !uiState.isUpdatingProfile && !uiState.isLoadingProfile,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .height(48.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    if (uiState.isUpdatingProfile) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.button_save_profile),
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+            }
+        }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues) // Scaffold'un padding'ini uygula
         ) {
-            if (uiState.isLoadingProfile) {
+            // Sadece ilk yüklemede tam ekran loading göster,
+            // arka planda tazeleme sırasında içeriği gizleme.
+            if (uiState.isLoadingProfile && uiState.profileData == null) {
                 LoadingIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
+                // Ana içerik Column'u, kaydırılabilir ve boşluklu
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp) // Kartlar arası dikey boşluk
                 ) {
-                    OutlinedTextField(
-                        value = businessName,
-                        onValueChange = { viewModel.onBusinessNameChanged(it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.screen_title_business_profile)) },
-                        leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Email
-                        ),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = contactEmail,
-                        onValueChange = { viewModel.onContactEmailChanged(it) },
-                        label = { Text(stringResource(R.string.label_contact_email)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next)
-                    )
-                    OutlinedTextField(
-                        value = contactPhone,
-                        onValueChange = { viewModel.onContactPhoneChanged(it) },
-                        label = { Text(stringResource(R.string.label_contact_phone)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Phone
-                        ),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = address,
-                        onValueChange = { viewModel.onAddressChanged(it) },
-                        label = { Text(stringResource(R.string.label_address)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
-                        maxLines = 3,
-                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next)
-                    )
-                    OutlinedTextField(
-                        value = logoUrl,
-                        onValueChange = { viewModel.onLogoUrlChanged(it) },
-                        label = { Text(stringResource(R.string.label_logo_url_optional)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            imeAction = ImeAction.Done,
-                            keyboardType = KeyboardType.Uri
-                        ),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { viewModel.saveBusinessProfile() },
-                        enabled = !uiState.isUpdatingProfile,
-                        modifier = Modifier.fillMaxWidth()
+                    // Temel Bilgiler Kartı
+                    SectionCard(
+                        title = stringResource(R.string.header_basic_info),
+                        icon = Icons.Default.Business
                     ) {
-                        if (uiState.isUpdatingProfile) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
+                        OutlinedTextField(
+                            value = businessName,
+                            onValueChange = viewModel::onBusinessNameChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.label_business_name_required)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
+                            // TODO: ViewModel'dan gelen validasyon sonucuna göre isError ve supportingText ekle
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = logoUrl,
+                            onValueChange = viewModel::onLogoUrlChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.label_logo_url_optional)) },
+                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                keyboardType = KeyboardType.Uri,
+                                imeAction = ImeAction.Next
+                            ),
+                        )
+                    }
+
+                    // İletişim Bilgileri Kartı
+                    SectionCard(
+                        title = stringResource(R.string.header_contact_info),
+                        icon = Icons.Default.ConnectWithoutContact
+                    ) {
+                        OutlinedTextField(
+                            value = contactEmail,
+                            onValueChange = viewModel::onContactEmailChanged,
+                            label = { Text(stringResource(R.string.label_contact_email)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                keyboardType = KeyboardType.Email,
+                                imeAction = ImeAction.Next
                             )
-                        } else {
-                            Text(stringResource(R.string.button_save_profile))
-                        }
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = contactPhone,
+                            onValueChange = viewModel::onContactPhoneChanged,
+                            label = { Text(stringResource(R.string.label_contact_phone)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                keyboardType = KeyboardType.Phone,
+                                imeAction = ImeAction.Next
+                            ),
+                            singleLine = true
+                        )
+                    }
+
+                    // Konum Bilgileri Kartı
+                    SectionCard(
+                        title = stringResource(R.string.header_location_info),
+                        icon = Icons.Default.LocationOn
+                    ) {
+                        OutlinedTextField(
+                            value = address,
+                            onValueChange = viewModel::onAddressChanged,
+                            label = { Text(stringResource(R.string.label_address)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 4,
+                            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done)
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Form bölümlerini sarmalamak için yeniden kullanılabilir bir Card bileşeni.
+ * Başlık ve ikon ile görsel hiyerarşi sağlar.
+ */
+@Composable
+fun SectionCard(
+    title: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold // SemiBold daha yumuşak bir vurgu sağlar
+                )
+            }
+            // Kartın içeriği (TextField'lar vb.) bu ColumnScope içinde render edilir.
+            content()
         }
     }
 }

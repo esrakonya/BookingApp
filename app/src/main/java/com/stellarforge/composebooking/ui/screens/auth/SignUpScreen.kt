@@ -9,6 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -133,8 +135,18 @@ fun SignUpScreen(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
                         trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Lock else Icons.Filled.Warning
-                            val description = if (passwordVisible) stringResource(R.string.auth_hide_password_desc) else stringResource(R.string.auth_show_password_desc)
+                            // passwordVisible true ise, şifre görünür demektir.
+                            // Bu durumda "şifreyi gizle" ikonunu (gözü kapalı) gösteririz.
+                            val image = if (passwordVisible)
+                                Icons.Filled.VisibilityOff
+                            else
+                                Icons.Filled.Visibility
+
+                            val description = if (passwordVisible)
+                                stringResource(R.string.auth_hide_password_desc)
+                            else
+                                stringResource(R.string.auth_show_password_desc)
+
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(imageVector = image, contentDescription = description)
                             }
@@ -167,9 +179,19 @@ fun SignUpScreen(
                             }
                         ),
                         trailingIcon = {
-                            val image = if (confirmPasswordVisible) Icons.Filled.Lock else Icons.Filled.Warning
-                            val description = if (confirmPasswordVisible) stringResource(R.string.auth_hide_password_desc) else stringResource(R.string.auth_show_password_desc)
-                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                            // passwordVisible true ise, şifre görünür demektir.
+                            // Bu durumda "şifreyi gizle" ikonunu (gözü kapalı) gösteririz.
+                            val image = if (passwordVisible)
+                                Icons.Filled.Visibility
+                            else
+                                Icons.Filled.VisibilityOff
+
+                            val description = if (passwordVisible)
+                                stringResource(R.string.auth_hide_password_desc)
+                            else
+                                stringResource(R.string.auth_show_password_desc)
+
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(imageVector = image, contentDescription = description)
                             }
                         },

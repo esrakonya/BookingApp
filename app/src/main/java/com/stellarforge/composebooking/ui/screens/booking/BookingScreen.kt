@@ -1,21 +1,27 @@
 package com.stellarforge.composebooking.ui.screens.booking
 
-import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.* // Gerekli tüm ikonlar için
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,51 +29,73 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.time.format.TextStyle
+import java.util.Locale
+import com.kizitonwose.calendar.compose.HorizontalCalendar
+import com.kizitonwose.calendar.compose.rememberCalendarState
+import com.kizitonwose.calendar.core.CalendarDay
+import com.kizitonwose.calendar.core.DayPosition
+import com.kizitonwose.calendar.core.daysOfWeek
+import kotlinx.coroutines.launch
 
-// BookingUiState'i ViewModel dosyasından import ettiğini varsayıyorum
-// BookingViewEvent'i ViewModel dosyasından import ettiğini varsayıyorum
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+// ViewModel'dan gelen state ve event'lerin import edildiğini varsayıyoruz.
+// import com.stellarforge.composebooking.ui.screens.booking.BookingViewModel.BookingViewEvent
+// import com.stellarforge.composebooking.ui.screens.booking.BookingUiState
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) // DÜZELTİLDİ: ExperimentalLayoutApi eklendi
 @Composable
 fun BookingScreen(
     navController: NavController,
-    serviceId: String, // Bu parametre ViewModel tarafından alınacak
     viewModel: BookingViewModel = hiltViewModel(),
     onBookingConfirmed: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val eventFlow = viewModel.eventFlow
+
     var showDatePicker by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    // Tek seferlik event'leri dinle
     LaunchedEffect(key1 = Unit) {
-        viewModel.eventFlow.collect { event ->
+        eventFlow.collect { event ->
+            // DÜZELTME: Event'lere tam yoluyla erişelim (ViewModel adıyla)
             when (event) {
-                is BookingViewModel.BookingViewEvent.NavigateToConfirmation -> {
+                is BookingViewEvent.NavigateToConfirmation -> {
                     onBookingConfirmed()
                 }
-                is BookingViewModel.BookingViewEvent.ShowSnackbar -> {
+
+                is BookingViewEvent.ShowSnackbar -> {
                     val message = if (event.formatArgs.isEmpty()) {
                         context.getString(event.messageId)
                     } else {
+                        // Spread operatörü (*) ile format argümanlarını doğru şekilde geçir
                         context.getString(event.messageId, *event.formatArgs.toTypedArray())
                     }
-                    snackbarHostState.showSnackbar(
-                        message = message,
-                        duration = SnackbarDuration.Short
-                    )
+                    // Snackbar'ı göstermek için yeni bir coroutine başlat
+                    // LaunchedEffect scope'u zaten bir coroutine scope'udur, ama
+                    // showSnackbar suspend olduğu için launch kullanmak daha güvenlidir.
+                    launch {
+                        snackbarHostState.showSnackbar(
+                            message = message,
+                            duration = SnackbarDuration.Short
+                        )
+                    }
                 }
             }
         }
+    }
+
+    LaunchedEffect(key1 = Unit) {
+        viewModel.onScreenReady()
     }
 
     Scaffold(
@@ -75,11 +103,7 @@ fun BookingScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (uiState.serviceName.isNotBlank()) {
-                            uiState.serviceName
-                        } else {
-                            stringResource(id = R.string.booking_screen_title_default)
-                        },
+                        text = uiState.serviceName.ifBlank { stringResource(id = R.string.booking_screen_title_default) },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -88,192 +112,74 @@ fun BookingScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(id = R.string.booking_screen_back_button_desc)
+                            contentDescription = stringResource(id = R.string.action_navigate_back)
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+                )
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-        ) {
-            // --- Servis Detayları Bölümü ---
-            if (uiState.isLoadingService) {
-                LoadingSection(text = stringResource(id = R.string.booking_screen_loading_service))
-            } else if (uiState.serviceName.isNotBlank()) {
-                SectionCard {
-                    SectionTitle(
-                        text = stringResource(R.string.booking_screen_section_service_details_title),
-                        icon = Icons.Filled.Info
-                    )
-                    Text(
-                        text = uiState.serviceName,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    Text(
-                        text = stringResource(id = R.string.booking_screen_duration_value_detailed, uiState.serviceDuration),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- Tarih ve Saat Seçimi Bölümü ---
-            SectionCard {
-                SectionTitle(
-                    text = stringResource(R.string.booking_screen_section_datetime_title),
-                    icon = Icons.Filled.DateRange
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        bottomBar = {
+            Surface(tonalElevation = 4.dp, shadowElevation = 4.dp) {
+                Button(
+                    onClick = viewModel::confirmBooking,
+                    enabled = !uiState.isLoadingService && !uiState.isBooking &&
+                            uiState.selectedSlot != null &&
+                            uiState.customerName.isNotBlank() &&
+                            uiState.nameErrorRes == null && uiState.phoneErrorRes == null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(52.dp)
                 ) {
-                    Text(
-                        text = stringResource(id = R.string.booking_screen_selected_date_label) + " ${
-                            uiState.selectedDate.format(
-                                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-                            )
-                        }",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedButton(onClick = { showDatePicker = true }) {
-                        Text(stringResource(R.string.booking_screen_change_date_button))
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    stringResource(id = R.string.booking_screen_select_time_label),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                if (uiState.isLoadingSlots) {
-                    LoadingSection(text = stringResource(id = R.string.booking_screen_loading_slots))
-                } else if (uiState.slotsErrorMessage != null) {
-                    Text(
-                        text = stringResource(id = uiState.slotsErrorMessage!!),
-                        color = if (uiState.slotsErrorMessage == R.string.booking_screen_no_slots) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
-                    )
-                } else if (uiState.availableSlots.isNotEmpty()) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        uiState.availableSlots.forEach { slot ->
-                            val isSelected = uiState.selectedSlot == slot
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.onSlotSelected(slot) },
-                                label = { Text(slot.format(DateTimeFormatter.ofPattern("HH:mm"))) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            )
+                    if (uiState.isBooking) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(stringResource(id = R.string.booking_screen_booking_in_progress))
                         }
-                    }
-                }
-
-                uiState.selectedSlot?.let {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.DateRange,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
+                    } else {
                         Text(
-                            text = stringResource(id = R.string.booking_screen_selected_slot_display, it.format(DateTimeFormatter.ofPattern("HH:mm"))),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
+                            stringResource(id = R.string.booking_screen_confirm_button),
+                            style = MaterialTheme.typography.titleSmall
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- Müşteri Bilgileri Formu Bölümü ---
-            SectionCard {
-                SectionTitle(
-                    text = stringResource(R.string.booking_screen_section_customer_info_title),
-                    icon = Icons.Filled.Person // Veya Person
+        }
+    ) { paddingValues ->
+        if (uiState.isLoadingService && uiState.serviceName.isBlank()) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(paddingValues)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ServiceDetailsSection(uiState = uiState)
+                DateTimeSelectionSection(
+                    uiState = uiState,
+                    onDateSelected = viewModel::onDateSelected,
+                    onSlotSelected = viewModel::onSlotSelected
                 )
-                OutlinedTextField(
-                    value = uiState.customerName,
-                    onValueChange = viewModel::onCustomerNameChanged,
-                    label = { Text(stringResource(id = R.string.booking_screen_name_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = uiState.nameErrorRes != null,
-                    supportingText = {
-                        uiState.nameErrorRes?.let { Text(stringResource(id = it), color = MaterialTheme.colorScheme.error) }
-                    },
-                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) }
+                CustomerInfoSection(
+                    uiState = uiState,
+                    onNameChanged = viewModel::onCustomerNameChanged,
+                    onPhoneChanged = { phone ->
+                        val filteredPhone = phone.filter { it.isDigit() }.take(11)
+                        viewModel.onCustomerPhoneChanged(filteredPhone)
+                    }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = uiState.customerPhone,
-                    onValueChange = { newPhone ->
-                        // Sadece rakamları ve en fazla 11 (veya belirlediğin maks.) haneyi al
-                        val filteredPhone = newPhone.filter { it.isDigit() }.take(11) // VEYA maxPhoneLength
-                        viewModel.onCustomerPhoneChanged(filteredPhone)
-                    },
-                    label = { Text(stringResource(id = R.string.booking_screen_phone_label)) },
-                    placeholder = { Text("0(XXX)-XXX-XX-XX") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    isError = uiState.phoneErrorRes != null,
-                    supportingText = {
-                        uiState.phoneErrorRes?.let { Text(stringResource(id = it), color = MaterialTheme.colorScheme.error) }
-                    },
-                    leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
-                    visualTransformation = PhoneNumberVisualTransformation()
-                )
-                // TODO: E-posta alanı eklenecekse buraya
-                // OutlinedTextField(...)
             }
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Onay Butonu
-            Button(
-                onClick = viewModel::confirmBooking,
-                enabled = !uiState.isLoadingService && !uiState.isBooking &&
-                        uiState.selectedSlot != null &&
-                        uiState.customerName.isNotBlank() && uiState.customerPhone.isNotBlank() &&
-                        uiState.nameErrorRes == null && uiState.phoneErrorRes == null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                if (uiState.isBooking) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(id = R.string.booking_screen_booking_in_progress))
-                    }
-                } else {
-                    Text(stringResource(id = R.string.booking_screen_confirm_button))
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp)) // En altta boşluk
         }
     }
 
@@ -283,16 +189,12 @@ fun BookingScreen(
                 .atStartOfDay(ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli(),
-            // Tarih seçicide bugünden önceki tarihlerin seçilmesini engelle
             selectableDates = object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                    return utcTimeMillis >= Instant.now()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate().atStartOfDay(ZoneId.systemDefault())
-                        .toInstant().toEpochMilli() - (24 * 60 * 60 * 1000) // Dünü de kapsasın diye -1 gün
+                    return utcTimeMillis >= LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 }
                 override fun isSelectableYear(year: Int): Boolean {
-                    return year >= LocalDate.now().year && year <= LocalDate.now().year + 2 // Örn: Mevcut yıl ve sonraki 2 yıl
+                    return year >= LocalDate.now().year && year <= LocalDate.now().year + 1
                 }
             }
         )
@@ -322,43 +224,220 @@ fun BookingScreen(
     }
 }
 
-// Yardımcı Composable'lar (Bu dosyanın altına veya ui/components'e taşınabilir)
+//--- YARDIMCI COMPOSABLE BİLEŞENLER ---
+
 @Composable
-private fun SectionCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
+private fun ServiceDetailsSection(uiState: BookingUiState) {
+    if (uiState.serviceName.isNotBlank()) {
+        SectionCard(
+            title = stringResource(R.string.booking_screen_section_service_details_title),
+            icon = Icons.Filled.Info // DÜZELTİLDİ: InfoOutline yerine Info
+        ) {
+            Text(
+                text = uiState.serviceName,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(id = R.string.booking_screen_duration_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = stringResource(id = R.string.booking_screen_duration_value, uiState.serviceDuration),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DateTimeSelectionSection(
+    uiState: BookingUiState,
+    onDateSelected: (LocalDate) -> Unit,
+    onSlotSelected: (LocalTime) -> Unit
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 1.dp,
+    SectionCard(
+        title = stringResource(R.string.booking_screen_section_datetime_title),
+        icon = Icons.Default.CalendarToday
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            content()
+        // --- TAKVİM KISMI (TAMAMEN DÜZELTİLDİ) ---
+        val currentMonth = remember { YearMonth.now() }
+        val startMonth = remember { currentMonth }
+        val endMonth = remember { currentMonth.plusMonths(3) }
+        val daysOfWeek = remember { daysOfWeek() }
+
+        val calendarState = rememberCalendarState(
+            startMonth = startMonth,
+            endMonth = endMonth,
+            firstVisibleMonth = currentMonth,
+            firstDayOfWeek = daysOfWeek.first()
+        )
+
+        val visibleMonth = remember { derivedStateOf { calendarState.firstVisibleMonth } }.value
+        Text(
+            text = "${visibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.titlecase(Locale.getDefault()) }} ${visibleMonth.yearMonth.year}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(bottom = 10.dp)
+        )
+
+        // Haftanın günleri başlığı (PZT, SAL, ...)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            daysOfWeek.forEach { dayOfWeek ->
+                Text(
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    text = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Yatay Takvim
+        HorizontalCalendar(
+            state = calendarState,
+            dayContent = { day ->
+                CalendarDay( // Düzeltilmiş CalendarDay'i kullan
+                    day = day,
+                    isSelected = uiState.selectedDate == day.date,
+                    onDayClick = { clickedDate ->
+                        if (day.position == DayPosition.MonthDate) { // Sadece ayın içindeki günlere tıkla
+                            onDateSelected(clickedDate)
+                        }
+                    }
+                )
+            }
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+        // --- SAAT SLOTLARI KISMI (TAMAMEN DÜZELTİLDİ) ---
+        if (uiState.isLoadingSlots) {
+            LoadingSection(text = stringResource(R.string.booking_screen_loading_slots))
+        } else if (uiState.availableSlots.isEmpty()) {
+            Text(
+                stringResource(id = R.string.booking_screen_no_slots),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            FlowRow( // Resmi FlowRow kullanımı
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                uiState.availableSlots.forEach { slot ->
+                    val isSelected = uiState.selectedSlot == slot
+                    val chipEnabled = !uiState.isLoadingSlots
+
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onSlotSelected(slot) },
+                        label = { Text(slot.format(DateTimeFormatter.ofPattern("HH:mm"))) },
+                        enabled = chipEnabled,
+                        leadingIcon = if (isSelected) {
+                            { Icon(Icons.Filled.Check, contentDescription = "Selected", modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+                        } else null,
+                        border = BorderStroke(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = when {
+                                !chipEnabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                isSelected -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.outline
+                            }
+                        ),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(
-    text: String,
-    icon: ImageVector? = null,
-    modifier: Modifier = Modifier
+private fun CustomerInfoSection(
+    uiState: BookingUiState,
+    onNameChanged: (String) -> Unit,
+    onPhoneChanged: (String) -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.padding(bottom = 12.dp)
+    SectionCard(
+        title = stringResource(R.string.booking_screen_section_customer_info_title),
+        icon = Icons.Default.Person // DÜZELTİLDİ: PersonOutline yerine Person
     ) {
-        icon?.let {
-            Icon(
-                imageVector = it,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(8.dp))
+        OutlinedTextField(
+            value = uiState.customerName,
+            onValueChange = onNameChanged,
+            label = { Text(stringResource(id = R.string.booking_screen_name_label)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = uiState.nameErrorRes != null,
+            supportingText = { uiState.nameErrorRes?.let { Text(stringResource(id = it)) } },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = uiState.customerPhone,
+            onValueChange = onPhoneChanged,
+            label = { Text(stringResource(id = R.string.booking_screen_phone_label)) },
+            placeholder = { Text("05xx xxx xx xx") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+            isError = uiState.phoneErrorRes != null,
+            supportingText = { uiState.phoneErrorRes?.let { Text(stringResource(id = it)) } },
+            visualTransformation = PhoneNumberVisualTransformation()
+        )
+    }
+}
+
+@Composable
+private fun SectionCard(
+    title: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            content()
         }
-        Text(text = text, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -375,5 +454,39 @@ private fun LoadingSection(text: String, modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun CalendarDay(
+    day: CalendarDay, // DÜZELTİLDİ: WeekDay yerine CalendarDay
+    isSelected: Boolean,
+    onDayClick: (LocalDate) -> Unit
+) {
+    val isSelectable = day.position == DayPosition.MonthDate && day.date >= LocalDate.now()
+
+    Box(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .padding(4.dp)
+            .clip(CircleShape)
+            .background(color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .clickable(
+                enabled = isSelectable,
+                onClick = { onDayClick(day.date) }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        val textColor = when {
+            !isSelectable -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            isSelected -> MaterialTheme.colorScheme.onPrimary
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+        Text(
+            text = day.date.dayOfMonth.toString(),
+            color = textColor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }

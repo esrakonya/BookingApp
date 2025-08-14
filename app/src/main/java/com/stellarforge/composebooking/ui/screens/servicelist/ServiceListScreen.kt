@@ -41,10 +41,6 @@ fun ServiceListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadInitialData()
-    }
-
     LaunchedEffect(key1 = eventFlow) {
         eventFlow.collect { event ->
             when (event) {
@@ -70,7 +66,10 @@ fun ServiceListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(id = R.string.service_list_title)) },
+                title = {
+                    val businessName by viewModel.businessName.collectAsState()
+                    Text(businessName ?: stringResource(id = R.string.service_list_title))
+                },
                 actions = {
                     // YENİ İŞLETME PROFİLİ DÜZENLEME BUTONU
                     IconButton(onClick = {

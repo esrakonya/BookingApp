@@ -5,10 +5,14 @@ import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.data.model.BookedSlot // Yeni import
 import com.stellarforge.composebooking.data.repository.AppointmentRepository
 import com.stellarforge.composebooking.data.repository.SlotRepository // Yeni import
+import com.stellarforge.composebooking.utils.Result
 import io.mockk.*
+import io.mockk.impl.annotations.RelaxedMockK
+import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
@@ -17,8 +21,16 @@ import java.time.ZoneId
 class CreateAppointmentUseCaseTest {
 
     // Mock Bağımlılıklar
+    @get:Rule
+    val mockkRule = MockKRule(this)
+
+    @RelaxedMockK
     private lateinit var mockAppointmentRepository: AppointmentRepository
+
+    @RelaxedMockK
     private lateinit var mockSlotRepository: SlotRepository
+
+    @RelaxedMockK
     private lateinit var mockDocumentReference: DocumentReference
 
     // Test Edilecek Sınıf
@@ -39,20 +51,12 @@ class CreateAppointmentUseCaseTest {
 
     @Before
     fun setUp() {
-        // Mock'ları oluştur (relaxed = true, varsayılan başarılı dönüşler için)
-        mockAppointmentRepository = mockk(relaxed = true)
-        mockSlotRepository = mockk(relaxed = true)
-        mockDocumentReference = mockk()
-
-        // Yeni ID alma ve ID ile oluşturma için temel davranışları ayarla
         every { mockAppointmentRepository.getNewAppointmentReference() } returns mockDocumentReference
         every { mockDocumentReference.id } returns testAppointmentId
-        // relaxed=true olduğu için success döndürmelerini bekliyoruz, ama açıkça da belirtilebilir:
-        coEvery { mockAppointmentRepository.createAppointmentWithId(any(), any()) } returns Result.success(Unit)
-        coEvery { mockSlotRepository.addSlot(any()) } returns Result.success(Unit)
+        // Başarılı durumları açıkça belirtelim
+        coEvery { mockAppointmentRepository.createAppointmentWithId(any(), any()) } returns Result.Success(Unit)
+        coEvery { mockSlotRepository.addSlot(any()) } returns Result.Success(Unit)
 
-
-        // UseCase'i mock repository'ler ile oluştur
         createAppointmentUseCase = CreateAppointmentUseCase(
             mockAppointmentRepository,
             mockSlotRepository
@@ -81,7 +85,7 @@ class CreateAppointmentUseCaseTest {
         )
 
         // Assert - Sonuç Başarılı mı?
-        assertTrue("Result should be successful", actualResult.isSuccess)
+        assertTrue("Result should be successful", actualResult is Result.Success)
 
         // Verify - Doğru metotlar çağrıldı mı?
         coVerify(exactly = 1) { mockAppointmentRepository.getNewAppointmentReference() }
@@ -129,9 +133,10 @@ class CreateAppointmentUseCaseTest {
             customerEmail = testCustomerEmail
         )
         // Assert
-        assertTrue(actualResult.isFailure)
-        assertTrue(actualResult.exceptionOrNull() is IllegalArgumentException)
-        assertEquals("User ID cannot be blank.", actualResult.exceptionOrNull()?.message)
+        assertTrue("Result should be Error", actualResult is Result.Error)
+        val errorResult = actualResult as Result.Error
+        assertTrue(errorResult.exception is IllegalArgumentException)
+        assertEquals("User ID cannot be blank.", errorResult.exception.message)
         // Hiçbir repository metodu çağrılmamalı (ID alma dahil)
         coVerify(exactly = 0) { mockAppointmentRepository.getNewAppointmentReference() }
         coVerify(exactly = 0) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
@@ -153,9 +158,10 @@ class CreateAppointmentUseCaseTest {
             customerEmail = testCustomerEmail
         )
         // Assert
-        assertTrue(actualResult.isFailure)
-        assertTrue(actualResult.exceptionOrNull() is IllegalArgumentException)
-        assertEquals("Service ID cannot be blank.", actualResult.exceptionOrNull()?.message)
+        assertTrue("Result should be Error", actualResult is Result.Error)
+        val errorResult = actualResult as Result.Error
+        assertTrue(errorResult.exception is IllegalArgumentException)
+        assertEquals("Service ID cannot be blank.", errorResult.exception.message)
         coVerify(exactly = 0) { mockAppointmentRepository.getNewAppointmentReference() }
         coVerify(exactly = 0) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
         coVerify(exactly = 0) { mockSlotRepository.addSlot(any()) }
@@ -177,9 +183,10 @@ class CreateAppointmentUseCaseTest {
             customerEmail = testCustomerEmail
         )
         // Assert
-        assertTrue(actualResult.isFailure)
-        assertTrue(actualResult.exceptionOrNull() is IllegalArgumentException)
-        assertEquals("Customer name and phone cannot be empty.", actualResult.exceptionOrNull()?.message)
+        assertTrue("Result should be Error", actualResult is Result.Error)
+        val errorResult = actualResult as Result.Error
+        assertTrue(errorResult.exception is IllegalArgumentException)
+        assertEquals("Customer name and phone cannot be empty.", actualResult.exception.message)
         coVerify(exactly = 0) { mockAppointmentRepository.getNewAppointmentReference() }
         coVerify(exactly = 0) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
         coVerify(exactly = 0) { mockSlotRepository.addSlot(any()) }
@@ -200,9 +207,10 @@ class CreateAppointmentUseCaseTest {
             customerEmail = testCustomerEmail
         )
         // Assert
-        assertTrue(actualResult.isFailure)
-        assertTrue(actualResult.exceptionOrNull() is IllegalArgumentException)
-        assertEquals("Customer name and phone cannot be empty.", actualResult.exceptionOrNull()?.message)
+        assertTrue(actualResult is Result.Error)
+        val errorResult = actualResult as Result.Error
+        assertTrue(errorResult.exception is IllegalArgumentException)
+        assertEquals("Customer name and phone cannot be empty.", errorResult.exception.message)
         coVerify(exactly = 0) { mockAppointmentRepository.getNewAppointmentReference() }
         coVerify(exactly = 0) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
         coVerify(exactly = 0) { mockSlotRepository.addSlot(any()) }
@@ -228,7 +236,7 @@ class CreateAppointmentUseCaseTest {
         )
 
         // Assert
-        assertTrue(result.isSuccess) // İşlem başarılı olmalı
+        assertTrue(result is Result.Success) // İşlem başarılı olmalı
         coVerify(exactly = 1) {
             mockAppointmentRepository.createAppointmentWithId(any(), capture(appointmentSlot))
         }
@@ -240,30 +248,27 @@ class CreateAppointmentUseCaseTest {
 
     @Test
     fun `invoke() when appointment repository fails during createWithId should return failure and not call slot repository`() = runTest {
-        // Arrange
+        // ARRANGE
         val repositoryException = Exception("Firestore appointment write failed")
-        // ID alma başarılı olsun
-        every { mockAppointmentRepository.getNewAppointmentReference() } returns mockDocumentReference
-        every { mockDocumentReference.id } returns testAppointmentId
-        // Ama ID ile yazma başarısız olsun
-        coEvery { mockAppointmentRepository.createAppointmentWithId(mockDocumentReference, any()) } returns Result.failure(repositoryException)
-        // Slot repository hiç çağrılmamalı
-        coEvery { mockSlotRepository.addSlot(any()) } returns Result.success(Unit) // Bu çağrılmayacak
+        coEvery { mockAppointmentRepository.createAppointmentWithId(mockDocumentReference, any()) } returns Result.Error(repositoryException)
 
-        // Act
+        // ACT
         val actualResult = createAppointmentUseCase(
             userId = testUserId, serviceId = testServiceId, serviceName = testServiceName,
             serviceDuration = testServiceDuration, date = testDate, time = testTime,
             customerName = testCustomerName, customerPhone = testCustomerPhone, customerEmail = testCustomerEmail
         )
 
-        // Assert
-        assertTrue("Result should be failure", actualResult.isFailure) // Bu satır muhtemelen zaten vardı ve doğruydu
-        val actualException = actualResult.exceptionOrNull()
-        assertNotNull("Exception should not be null when appointment repo fails", actualException)
-        assertTrue("Exception type should be Exception", actualException is Exception)
-        assertEquals("Exception message should match", repositoryException.message, actualException?.message) // Mesajı karşılaştır
+        // ASSERT
+        // DÜZELTİLDİ:
+        assertTrue("Result should be an instance of Result.Error", actualResult is Result.Error)
+        val errorResult = actualResult as Result.Error
 
+        // Exception türünü kontrol etmek yerine, doğrudan nesneyi karşılaştıralım.
+        // Bu hem türü hem de içeriği (mesajı) doğrular.
+        assertEquals(repositoryException, errorResult.exception)
+
+        // Verify
         coVerify(exactly = 1) { mockAppointmentRepository.getNewAppointmentReference() }
         coVerify(exactly = 1) { mockAppointmentRepository.createAppointmentWithId(mockDocumentReference, any()) }
         coVerify(exactly = 0) { mockSlotRepository.addSlot(any()) }
@@ -271,26 +276,26 @@ class CreateAppointmentUseCaseTest {
 
     @Test
     fun `invoke() when slot repository fails should return failure`() = runTest {
-        // Arrange
+        // ARRANGE
         val slotRepositoryException = Exception("Firestore slot write failed")
-        // ID alma ve Appointment yazma başarılı olsun (setUp'ta ayarlı)
-        // Slot yazma başarısız olsun
-        coEvery { mockSlotRepository.addSlot(any()) } returns Result.failure(slotRepositoryException)
+        coEvery { mockSlotRepository.addSlot(any()) } returns Result.Error(slotRepositoryException)
 
-        // Act
+        // ACT
         val actualResult = createAppointmentUseCase(
             userId = testUserId, serviceId = testServiceId, serviceName = testServiceName,
             serviceDuration = testServiceDuration, date = testDate, time = testTime,
             customerName = testCustomerName, customerPhone = testCustomerPhone, customerEmail = testCustomerEmail
         )
 
-        // Assert
-        assertTrue("Result should be failure when slot repo fails", actualResult.isFailure) // Bu satır doğruydu
-        val actualException = actualResult.exceptionOrNull()
-        assertNotNull("Exception should not be null when slot repo fails", actualException)
-        assertTrue("Exception type should be Exception", actualException is Exception)
-        assertEquals("Exception message should match", slotRepositoryException.message, actualException?.message) // Mesajı karşılaştır
+        // ASSERT
+        // DÜZELTİLDİ:
+        assertTrue("Result should be an instance of Result.Error", actualResult is Result.Error)
+        val errorResult = actualResult as Result.Error
 
+        // Doğrudan exception nesnelerini karşılaştır.
+        assertEquals(slotRepositoryException, errorResult.exception)
+
+        // Verify
         coVerify(exactly = 1) { mockAppointmentRepository.getNewAppointmentReference() }
         coVerify(exactly = 1) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
         coVerify(exactly = 1) { mockSlotRepository.addSlot(any()) }

@@ -8,6 +8,7 @@ import com.stellarforge.composebooking.utils.MainDispatcherRule
 import com.google.firebase.FirebaseNetworkException // Sadece TİPİNİ belirtmek için import
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.stellarforge.composebooking.utils.Result
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -49,7 +50,7 @@ class SignUpViewModelTest {
         viewModel = SignUpViewModel(mockSignUpUseCase)
 
         // Varsayılan başarılı signUp
-        coEvery { mockSignUpUseCase(any(), any()) } returns Result.success(successUser)
+        coEvery { mockSignUpUseCase(any(), any()) } returns Result.Success(successUser)
 
         // Mock exception'lar için temel davranışlar
         every { mockNetworkException.localizedMessage } returns "Mocked Network Error"
@@ -175,7 +176,7 @@ class SignUpViewModelTest {
 
     @Test
     fun `onSignUpClick with valid input and failed signUp (UserCollision) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.failure(mockUserCollisionException)
+        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.Error(mockUserCollisionException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -191,7 +192,7 @@ class SignUpViewModelTest {
 
     @Test
     fun `onSignUpClick with valid input and failed signUp (WeakPassword) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.failure(mockWeakPasswordException)
+        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.Error(mockWeakPasswordException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword) // ViewModel validasyonu geçmeli, Firebase'den hata gelmeli
@@ -207,7 +208,7 @@ class SignUpViewModelTest {
 
     @Test
     fun `onSignUpClick with valid input and failed signUp (OtherError) sets general signup_failed error`() = runTest {
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.failure(mockOtherException)
+        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.Error(mockOtherException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -234,7 +235,7 @@ class SignUpViewModelTest {
             // isLoading'in true olarak set edildiğini ve ikinci tıklamanın
             // UseCase'i tekrar tetiklemediğini doğrulamak için bir gecikme ekleyelim.
             delay(100.milliseconds) // veya daha uzun bir süre, dispatcher'a bağlı
-            Result.success(successUser)
+            Result.Success(successUser)
         }
 
         // Act

@@ -2,13 +2,14 @@
 
 [versions]
 # Android & Gradle
-agp = "8.6.0" # Güncel AGP sürümünü kontrol et
+agp = "8.2.0" # Güncel AGP sürümünü kontrol et
 gradle = "8.7" # AGP ile uyumlu Gradle sürümünü kontrol et (wrapper'dan)
 
 # Kotlin & Compose
-kotlin = "2.1.10" # Kotlin 2.x
+kotlin = "1.9.24" # Kotlin 2.x
 composeBom = "2024.04.01" # Kullandığın Compose BOM
-#composeCompiler = "1.5.10" # Kotlin 2.1.10 ile uyumlu Compose Compiler (Haritadan kontrol et!)
+ksp = "1.9.24-1.0.20"
+composeCompiler = "1.5.14" # Kotlin 2.1.10 ile uyumlu Compose Compiler (Haritadan kontrol et!)
 
 # AndroidX Core & Activity (compileSdk 35 gerektirebilir)
 coreKtx = "1.13.1" # Kararlı sürümü kontrol et
@@ -62,6 +63,7 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -103,13 +105,15 @@ androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testin
 # Log
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
+androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" } # Compose Compiler Plugin
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+# kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
 # ksp = { ... } # KSP kullanmıyoruz
 
 [bundles]
@@ -121,6 +125,7 @@ compose = [
     "androidx-compose-material3",
     "androidx-navigation-compose",
     "androidx-lifecycle-viewmodel-compose",
+    "androidx-compose-animation",
 ]
 coroutines = ["kotlinx-coroutines-core", "kotlinx-coroutines-android"]
 androidTest = ["androidx-test-ext-junit", "androidx-espresso-core", "androidx-compose-ui-test-junit4"] # Alias düzeltildi

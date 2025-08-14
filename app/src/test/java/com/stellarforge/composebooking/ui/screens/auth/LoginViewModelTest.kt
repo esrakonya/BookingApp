@@ -8,6 +8,7 @@ import com.stellarforge.composebooking.utils.MainDispatcherRule
 import com.google.firebase.FirebaseNetworkException // Sadece TİPİNİ belirtmek için import
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.stellarforge.composebooking.utils.Result
 import io.mockk.* // mockk, coEvery, coVerify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -47,7 +48,7 @@ class LoginViewModelTest {
         viewModel = LoginViewModel(mockSignInUseCase)
 
         // Varsayılan başarılı signIn (her testte override edilebilir)
-        coEvery { mockSignInUseCase(any(), any()) } returns Result.success(successUser)
+        coEvery { mockSignInUseCase(any(), any()) } returns Result.Success(successUser)
 
         // Mock exception'lar için temel davranışlar (mesaj döndürme gibi)
         // Bu, exception.localizedMessage çağrıldığında NullPointerException vermesini engeller
@@ -78,7 +79,7 @@ class LoginViewModelTest {
 
     @Test
     fun `onLoginClick with valid input and failed signIn (InvalidCredentials) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.failure(mockInvalidCredentialsException)
+        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockInvalidCredentialsException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -93,7 +94,7 @@ class LoginViewModelTest {
 
     @Test
     fun `onLoginClick with valid input and failed signIn (NetworkError) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.failure(mockNetworkException)
+        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockNetworkException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -108,7 +109,7 @@ class LoginViewModelTest {
 
     @Test
     fun `onLoginClick with valid input and failed signIn (InvalidUser) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.failure(mockInvalidUserException)
+        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockInvalidUserException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -123,7 +124,7 @@ class LoginViewModelTest {
 
     @Test
     fun `onLoginClick with valid input and failed signIn (OtherError) sets general login_failed error`() = runTest {
-        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.failure(mockOtherException)
+        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockOtherException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -152,7 +153,7 @@ class LoginViewModelTest {
             // Şimdilik bu delay'i kaldırıp sadece çağrı sayısını kontrol edelim,
             // ViewModel'daki isLoading kontrolü yeterli olmalı.
             // delay(100.milliseconds)
-            Result.success(successUser)
+            Result.Success(successUser)
         }
 
         // Act

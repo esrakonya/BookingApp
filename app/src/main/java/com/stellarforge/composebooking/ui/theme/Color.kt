@@ -2,25 +2,36 @@ package com.stellarforge.composebooking.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Material 3 Tema Renkleri (Android Studio varsayılanları)
-// Açık Tema (Light Scheme) için ana renkler:
-val Purple40 = Color(0xFF6650a4) // Genellikle Primary olarak kullanılır
-val PurpleGrey40 = Color(0xFF625b71) // Genellikle Secondary veya Surface Variant olarak kullanılır
-val Pink40 = Color(0xFF7D5260) // Genellikle Tertiary olarak kullanılır
+// Ana Renkler (Lacivert tonları - Profesyonel ve Sakin)
+val PrimaryBlue = Color(0xFF2C3E50)       // Koyu Lacivert (Ana Butonlar, Başlıklar için)
+val OnPrimaryBlue = Color(0xFFFFFFFF)     // Ana Rengin Üzerindeki Metin (Beyaz)
+val PrimaryContainerBlue = Color(0xFFD3DCE5) // Ana Rengin Açık Tonu (Vurgu Alanları için)
+val OnPrimaryContainerBlue = Color(0xFF001E2F)// Vurgu Alanlarının Üzerindeki Metin
 
-// Koyu Tema (Dark Scheme) için ana renkler:
-val Purple80 = Color(0xFFD0BCFF) // Genellikle Primary olarak kullanılır
-val PurpleGrey80 = Color(0xFFCCC2DC) // Genellikle Secondary veya Surface Variant olarak kullanılır
-val Pink80 = Color(0xFFEFB8C8) // Genellikle Tertiary olarak kullanılır
+// İkincil Renkler (Nötr Gri tonları - Destekleyici)
+val SecondaryGrey = Color(0xFF535F70)      // Orta Gri (İkonlar, Alt Metinler için)
+val OnSecondaryGrey = Color(0xFFFFFFFF)    // İkincil Rengin Üzerindeki Metin
+val SecondaryContainerGrey = Color(0xFFD9E3F0)// Açık Gri (Kart Arka Planları için)
+val OnSecondaryContainerGrey = Color(0xFF101C2B)// Açık Gri Üzerindeki Metin
 
-// --- EK ÖZELLEŞTİRİLEBİLİR RENKLER (ÖRNEK) ---
-// Şablon kullanıcılarının kolayca değiştirebileceği ek renkler tanımlanabilir.
-// Bu renkler Theme.kt içinde veya doğrudan Composable'larda kullanılabilir.
-// Örnek:
-// val SuccessColor = Color(0xFF4CAF50)
-// val WarningColor = Color(0xFFFFC107)
-// val ErrorColorMaterial = Color(0xFFF44336) // Zaten MaterialTheme.colorScheme.error var ama override edilebilir.
+// Hata Rengi
+val ErrorRed = Color(0xFFB00020)
+val OnErrorRed = Color.White
 
-// val PositiveActionBackground = Color(0xFF4CAF50)
-// val NegativeActionBackground = Color(0xFFD32F2F)
-// val NeutralActionBackground = Color(0xFF757575)
+// Nötr Renkler (Açık Tema)
+val BackgroundLight = Color(0xFFF7F9FC)
+val OnBackgroundLight = Color(0xFF1A1C1E)
+val SurfaceLight = Color(0xFFFFFFFF)
+val OnSurfaceLight = Color(0xFF1A1C1E)
+val SurfaceVariantLight = Color(0xFFDEE3EB)
+val OnSurfaceVariantLight = Color(0xFF42474E)
+val OutlineLight = Color(0xFF72777F)
+
+// Nötr Renkler (Koyu Tema)
+val BackgroundDark = Color(0xFF1A1C1E)
+val OnBackgroundDark = Color(0xFFE2E2E6)
+val SurfaceDark = Color(0xFF1A1C1E)
+val OnSurfaceDark = Color(0xFFE2E2E6)
+val SurfaceVariantDark = Color(0xFF42474E)
+val OnSurfaceVariantDark = Color(0xFFC2C7CE)
+val OutlineDark = Color(0xFF8C9199)

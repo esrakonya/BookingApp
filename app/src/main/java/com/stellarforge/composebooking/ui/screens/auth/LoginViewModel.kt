@@ -120,7 +120,7 @@ class LoginViewModel @Inject constructor(
                     val errorRes = when (result.exception) {
                         is FirebaseNetworkException -> R.string.error_network_connection
                         is FirebaseAuthInvalidCredentialsException -> R.string.error_auth_invalid_credentials
-                        is FirebaseAuthInvalidUserException -> R.string.error_auth_user_not_found // Veya yine invalid_credentials
+                        is FirebaseAuthInvalidUserException -> R.string.error_auth_invalid_credentials // Veya yine invalid_credentials
                         is IllegalArgumentException -> R.string.error_auth_generic_signup // Validasyon hatası UseCase'den geliyorsa
                         else -> R.string.error_login_failed // Diğer genel hatalar
                     }

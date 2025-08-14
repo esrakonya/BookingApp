@@ -14,6 +14,8 @@ import org.junit.runner.Description
 class MainDispatcherRule(
     val testDispatcher: TestDispatcher = StandardTestDispatcher(), // Veya UnconfinedTestDispatcher()
 ) : TestWatcher() {
+    val testScope = TestScope(testDispatcher) // Kendi TestScope'umuzu oluşturalım
+    val scheduler = testDispatcher.scheduler
 
     override fun starting(description: Description) {
         super.starting(description)

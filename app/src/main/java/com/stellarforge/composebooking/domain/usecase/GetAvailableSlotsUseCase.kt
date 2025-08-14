@@ -28,92 +28,81 @@ class GetAvailableSlotsUseCase @Inject constructor(
         Timber.d("GetAvailableSlotsUseCase: Invoked for date: $date, duration: $serviceDuration")
         emit(Result.Loading)
         try {
-            // SlotRepository'den getSlotsForDate'in Result<List<BookedSlot>> döndürdüğünü varsayıyoruz
-            // Eğer Flow<Result<List<BookedSlot>>> döndürüyorsa, .first() veya .collect {} gerekir.
-            // Şimdilik suspend fun olduğunu ve direkt Result döndürdüğünü varsayalım.
-            // Eğer Flow döndürüyorsa, bu kısım değişmeli.
-            val slotsResult: com.stellarforge.composebooking.utils.Result<List<BookedSlot>> =
-                slotRepository.getSlotsForDate(date) // Bu suspend bir fonksiyon olmalı
+            // 2. Repository'den o güne ait dolu slotları al
+            when (val slotsResult = slotRepository.getSlotsForDate(date)) {
+                is Result.Success -> {
+                    val bookedSlots = slotsResult.data
+                    Timber.d("UseCase: Fetched ${bookedSlots.size} booked slots for date: $date")
 
-            when (slotsResult) {
-                is com.stellarforge.composebooking.utils.Result.Success -> {
-                    Timber.d("GetAvailableSlotsUseCase: Successfully fetched booked slots. Count: ${slotsResult.data.size}")
-                    // Başarılıysa, randevu listesini al ve hesaplamayı yap
-                    val bookedSlots: List<BookedSlot> = slotsResult.data // DÜZELTİLDİ: .data ile erişim
-                    val availableTimes = calculateAvailableTimes(date, serviceDuration, bookedSlots)
-                    Timber.d("GetAvailableSlotsUseCase: Calculated available times. Count: ${availableTimes.size}")
-                    emit(Result.Success(availableTimes)) // Hesaplanan saatleri emit et
+                    // 3. Müsait saatleri hesapla
+                    val availableSlots = calculateAvailableSlots(bookedSlots, serviceDuration)
+
+                    // 4. Hesaplanan müsait saatleri Success olarak yay
+                    emit(Result.Success(availableSlots))
                 }
-                is com.stellarforge.composebooking.utils.Result.Error -> {
-                    Timber.e(slotsResult.exception, "GetAvailableSlotsUseCase: Error fetching booked slots. Message: ${slotsResult.message}")
-                    // Randevuları çekerken hata olduysa, hatayı emit et
-                    emit(Result.Error(slotsResult.exception, slotsResult.message ?: "Error fetching booked slots in UseCase")) // DÜZELTİLDİ
+                is Result.Error -> {
+                    Timber.e(slotsResult.exception, "UseCase: Error fetching slots from repository.")
+                    // Repository'den gelen hatayı doğrudan yukarı yay
+                    emit(slotsResult)
                 }
-                is com.stellarforge.composebooking.utils.Result.Loading -> {
-                    // Eğer slotRepository.getSlotsForDate kendisi Loading döndürebiliyorsa
-                    // bu durumu tekrar emit edebiliriz. Zaten en başta emit etmiştik.
-                    Timber.d("GetAvailableSlotsUseCase: slotRepository.getSlotsForDate is Loading.")
+                is Result.Loading -> {
+                    // Repository'nin kendisi de Loading döndürebilir, bu durumu yukarı yay
                     emit(Result.Loading)
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "GetAvailableSlotsUseCase: Unexpected error during flow execution.")
-            // Flow sırasında beklenmedik bir hata olursa yakala ve emit et
-            emit(Result.Error(Exception("UseCase: Error calculating available slots", e)))
+            Timber.e(e, "UseCase: Error calculating available slots")
+            // Hesaplama sırasında veya repository çağrısında beklenmedik bir hata olursa
+            val wrappedException = Exception("UseCase: Error calculating available slots for $date", e)
+            emit(Result.Error(wrappedException))
         }
     }.catch { e ->
         Timber.e(e, "GetAvailableSlotsUseCase: Unhandled error in flow chain.")
         emit(Result.Error(Exception("UseCase: Unhandled error calculating available slots", e)))
     }.flowOn(Dispatchers.Default) // Hesaplama işlemleri için Default dispatcher
 
-    // Müsait saatleri hesaplayan yardımcı fonksiyon (Repository'den buraya taşındı)
-    private fun calculateAvailableTimes(
-        date: LocalDate,
-        serviceDuration: Int,
-        bookedSlots: List<BookedSlot>
+    private fun calculateAvailableSlots(
+        bookedSlots: List<BookedSlot>,
+        serviceDurationMinutes: Int
     ): List<LocalTime> {
-        val availableSlots = mutableListOf<LocalTime>()
+        val availableTimeSlots = mutableListOf<LocalTime>()
         val openingTime = BusinessConstants.OPENING_TIME
         val closingTime = BusinessConstants.CLOSING_TIME
-        val timeSlotInterval = BusinessConstants.SLOT_INTERVAL_MINUTES
+        val interval = BusinessConstants.SLOT_INTERVAL_MINUTES.toLong()
 
-        var currentTime = openingTime
-        while (currentTime.plusMinutes(serviceDuration.toLong()) <= closingTime) {
-            val potentialEndTime = currentTime.plusMinutes(serviceDuration.toLong())
+        // Dolu saat aralıklarını LocalTime cinsinden bir listeye çevirelim (daha kolay karşılaştırma için)
+        val bookedIntervals = bookedSlots.map {
+            val start = it.startTime.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalTime()
+            val end = it.endTime.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalTime()
+            start to end
+        }.sortedBy { it.first } // Başlangıç saatine göre sırala
+
+        var potentialStartTime = openingTime
+        while (potentialStartTime.plusMinutes(serviceDurationMinutes.toLong()) <= closingTime) {
+            val potentialEndTime = potentialStartTime.plusMinutes(serviceDurationMinutes.toLong())
+
             var isSlotAvailable = true
 
-            for (slot in bookedSlots) {
-                // Firestore Timestamp'i LocalTime'a çevir
-                val slotStartLocalDateTime = LocalDateTime.ofInstant(
-                    Instant.ofEpochSecond(slot.startTime.seconds, slot.startTime.nanoseconds.toLong()),
-                    ZoneId.systemDefault()
-                )
-                val slotEndLocalDateTime = LocalDateTime.ofInstant(
-                    Instant.ofEpochSecond(slot.endTime.seconds, slot.endTime.nanoseconds.toLong()),
-                    ZoneId.systemDefault()
-                )
-
-                // Sadece aynı güne ait slotları dikkate al
-                if (slotStartLocalDateTime.toLocalDate() == date) {
-                    val slotStart = slotStartLocalDateTime.toLocalTime()
-                    val slotEnd = slotEndLocalDateTime.toLocalTime()
-
-                    // Çakışma kontrolü: (İstenenBaşlangıç < SlotBitiş) && (İstenenBitiş > SlotBaşlangıç)
-                    if (currentTime.isBefore(slotEnd) && potentialEndTime.isAfter(slotStart)) {
-                        isSlotAvailable = false
-                        Timber.d("Slot conflict: Request [$currentTime - $potentialEndTime] conflicts with Booked [$slotStart - $slotEnd]")
-                        break
-                    }
+            // Potansiyel randevu aralığının (potentialStartTime, potentialEndTime)
+            // herhangi bir dolu aralıkla (bookedStart, bookedEnd) çakışıp çakışmadığını kontrol et
+            for ((bookedStart, bookedEnd) in bookedIntervals) {
+                // Çakışma koşulu:
+                // Bir aralığın başlangıcı, diğer aralık bitmeden önceyse VE
+                // o aralığın bitişi, diğer aralığın başlangıcından sonraysa çakışma vardır.
+                // (StartA < EndB) and (EndA > StartB)
+                if (potentialStartTime < bookedEnd && potentialEndTime > bookedStart) {
+                    isSlotAvailable = false
+                    break // Çakışma bulundu, daha fazla kontrol etmeye gerek yok
                 }
             }
 
             if (isSlotAvailable) {
-                availableSlots.add(currentTime)
+                availableTimeSlots.add(potentialStartTime)
             }
 
-            currentTime = currentTime.plusMinutes(timeSlotInterval.toLong())
+            // Bir sonraki potansiyel zamanı sabit aralıkla artır
+            potentialStartTime = potentialStartTime.plusMinutes(interval)
         }
-        Timber.d("Calculated available slots for $date: $availableSlots")
-        return availableSlots
+        return availableTimeSlots
     }
 }

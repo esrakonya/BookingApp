@@ -100,28 +100,17 @@ fun AppNavigation(navController: NavHostController) {
             route = ScreenRoutes.BookingScreen.route, // "booking_screen/{serviceId}"
             arguments = listOf(navArgument("serviceId") { type = NavType.StringType }) // Argümanı tanımla
         ) { backStackEntry ->
-            // Argümanı al
-            val serviceId = backStackEntry.arguments?.getString("serviceId")
-            if (serviceId != null) {
-                // BookingScreen Composable'ını göster ve serviceId'yi ilet
-                BookingScreen(
-                    navController = navController, // Geri gitme veya onay ekranına gitme için
-                    serviceId = serviceId,
-                    onBookingConfirmed = {
-                        // Rezervasyon onaylandığında Confirmation ekranına git
-                        // Booking ekranını stack'ten çıkarmak isteyebiliriz
-                        navController.navigate(ScreenRoutes.BookingConfirmation.route) {
-                            popUpTo(ScreenRoutes.ServiceList.route) // Servis listesine kadar geri dön
-                            launchSingleTop = true // Eğer zaten oradaysa tekrar açma
+            BookingScreen(
+                navController = navController,
+                onBookingConfirmed = {
+                    navController.navigate(ScreenRoutes.BookingConfirmation.route) {
+                        popUpTo(backStackEntry.destination.id) {
+                            inclusive = true
                         }
+                        launchSingleTop = true
                     }
-                )
-            } else {
-                // serviceId gelmediyse bir hata durumu yönetilebilir veya geri gidilebilir
-                // Şimdilik boş bırakabiliriz veya bir hata mesajı gösterebiliriz.
-                // Loglama yapmak iyi olur.
-                navController.popBackStack() // Otomatik geri git
-            }
+                }
+            )
         }
 
         // BookingConfirmation Ekranı

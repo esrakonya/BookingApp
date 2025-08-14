@@ -38,9 +38,10 @@ sealed interface ServiceListUiState {
 }
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class ServiceListViewModel @OptIn(ExperimentalCoroutinesApi::class)
 @Inject constructor(
-    private val serviceRepository: AppointmentRepository, // ADINI serviceRepository OLARAK DEĞİŞTİRDİM, DAHA GENEL
+    private val serviceRepository: AppointmentRepository,
     private val signOutUseCase: SignOutUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val getBusinessProfileUseCase: GetBusinessProfileUseCase // YENİ ENJEKSİYON
@@ -155,7 +156,9 @@ class ServiceListViewModel @OptIn(ExperimentalCoroutinesApi::class)
                     }
                     is Result.Loading -> {
                         Timber.d("ServiceListViewModel: getServices Flow emitted Loading.")
-                        // _uiState.value = ServiceListUiState.Loading // Ana Loading state'i zaten ayarlı olabilir.
+                        if (_uiState.value !is ServiceListUiState.Loading) { // Sadece gerçekten gerekliyse Loading'e çek
+                            _uiState.value = ServiceListUiState.Loading
+                        }
                     }
                 }
             }
@@ -196,7 +199,7 @@ class ServiceListViewModel @OptIn(ExperimentalCoroutinesApi::class)
         viewModelScope.launch {
             Timber.d("ServiceListViewModel: Signing out user...")
             when (val result = signOutUseCase()) {
-                is Result.Success -> {
+                is Result.Success<*> -> {
                     Timber.i("ServiceListViewModel: User signed out successfully.")
                     _eventFlow.emit(ServiceListViewEvent.NavigateToLogin)
                 }
