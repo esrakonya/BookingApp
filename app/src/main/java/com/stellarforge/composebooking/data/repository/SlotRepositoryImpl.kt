@@ -19,9 +19,9 @@ class SlotRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getSlotsForDate(date: LocalDate): Result<List<BookedSlot>> {
+    override suspend fun getSlotsForDate(ownerId: String, date: LocalDate): Result<List<BookedSlot>> {
         return withContext(ioDispatcher) {
-            slotRemoteDataSource.getSlotsForDate(date)
+            slotRemoteDataSource.getSlotsForDate(ownerId, date)
         }
     }
 

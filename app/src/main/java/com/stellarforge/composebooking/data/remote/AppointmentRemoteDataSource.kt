@@ -34,7 +34,7 @@ class AppointmentRemoteDataSource @Inject constructor(
      * @param date Randevuların alınacağı tarih.
      * @return İlgili tarihteki randevu listesini veya hatayı içeren bir Result<List<Appointment>>.
      */
-    suspend fun getAppointmentsForDate(date: LocalDate): Result<List<Appointment>> {
+    suspend fun getAppointmentsForDate(ownerId: String, date: LocalDate): Result<List<Appointment>> {
         return try {
             val zoneId = ZoneId.systemDefault()
             val startInstant = date.atStartOfDay(zoneId).toInstant()
@@ -45,24 +45,20 @@ class AppointmentRemoteDataSource @Inject constructor(
 
             // Firestore sorgusu: Belirtilen tarih aralığındaki randevuları getir
             val snapshot = appointmentsCollection
+                .whereEqualTo("ownerId", ownerId)
                 .whereGreaterThanOrEqualTo("appointmentDateTime", startTimestamp)
                 .whereLessThanOrEqualTo("appointmentDateTime", endTimestamp)
                 .get()
                 .await()
 
-            // Snapshot'taki belgeleri Appointment listesine dönüştür
-            val appointments = snapshot.toObjects(Appointment::class.java)
-
-            // Okunan her randevuya belge ID'sini (Firestore document ID) ekle
-            snapshot.documents.forEachIndexed { index, document ->
-                if (index < appointments.size) {
-                    appointments[index].id = document.id
-                }
+            // GÜNCELLENDİ: ID ataması `copy()` ile yapılıyor.
+            val appointments = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(Appointment::class.java)?.copy(id = doc.id)
             }
 
             Result.Success(appointments)
         } catch (e: Exception) {
-            Result.Error(e)
+            Result.Error(e, "Randevular alınamadı.")
         }
     }
 

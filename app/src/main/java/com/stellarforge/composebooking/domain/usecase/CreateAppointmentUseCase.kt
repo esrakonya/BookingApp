@@ -20,6 +20,8 @@ class CreateAppointmentUseCase @Inject constructor(
     private val slotRepository: SlotRepository
 ) {
     suspend operator fun invoke(
+        ownerId: String,
+        servicePriceInCents: Long,
         userId: String,
         serviceId: String,
         serviceName: String,
@@ -30,6 +32,12 @@ class CreateAppointmentUseCase @Inject constructor(
         customerPhone: String,
         customerEmail: String?
     ): Result<Unit> {
+
+        if (ownerId.isBlank()) {
+            val exception = IllegalArgumentException("Owner ID cannot be blank.")
+            Timber.w(exception)
+            return Result.Error(exception)
+        }
 
         if (userId.isBlank()) {
             val exception = IllegalArgumentException("User ID cannot be blank.")
@@ -74,21 +82,24 @@ class CreateAppointmentUseCase @Inject constructor(
 
         val newAppointment = Appointment(
             id = newAppointmentId,
+            ownerId = ownerId,
             userId = userId,
             serviceId = serviceId,
             serviceName = serviceName,
+            servicePriceInCents = servicePriceInCents,
             durationMinutes = serviceDuration,
             appointmentDateTime = startTimestamp,
             customerName = customerName.trim(),
             customerPhone = customerPhone.trim(),
             customerEmail = customerEmail?.trim()?.takeIf { it.isNotEmpty() },
-            createdAt = Timestamp.now()
+            createdAt = null  // @ServerTimestamp bunu dolduracak
         )
 
         val newSlot = BookedSlot(
             startTime = startTimestamp,
             endTime = endTimestamp,
-            appointmentId = newAppointmentId
+            appointmentId = newAppointmentId,
+            ownerId = ownerId
         )
 
         try {

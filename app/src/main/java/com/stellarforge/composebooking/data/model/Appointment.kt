@@ -2,35 +2,45 @@ package com.stellarforge.composebooking.data.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.PropertyName
+import com.google.firebase.firestore.ServerTimestamp
+import java.util.Date
 
 // Firestore'daki 'appointments' koleksiyonundaki belgeleri temsil edecek data class
 data class Appointment (
-    var id: String = "",
+    val id: String = "",
 
-    @get:PropertyName("userId") @set:PropertyName("userId")
-    var userId: String = "",
+    @get:PropertyName("ownerId")
+    val ownerId: String = "",
 
-    @get:PropertyName("serviceId") @set:PropertyName("serviceId")
-    var serviceId: String = "",
+    @get:PropertyName("userId")
+    val userId: String = "",
 
-    @get:PropertyName("serviceName") @set:PropertyName("serviceName")
-    var serviceName: String = "",
+    @get:PropertyName("serviceId")
+    val serviceId: String = "",
 
-    @get:PropertyName("appointmentDateTime") @set:PropertyName("appointmentDateTime")
-    var appointmentDateTime: Timestamp = Timestamp.now(),
+    @get:PropertyName("serviceName")
+    val serviceName: String = "",
 
-    @get:PropertyName("durationMinutes") @set:PropertyName("durationMinutes")
-    var durationMinutes: Int = 0,
+    // YENİ EKLENEN KRİTİK ALAN
+    @get:PropertyName("servicePriceInCents")
+    val servicePriceInCents: Long = 0L,
 
-    @get:PropertyName("customerName") @set:PropertyName("customerName")
-    var customerName: String = "",
+    @get:PropertyName("durationMinutes")
+    val durationMinutes: Int = 0,
 
-    @get:PropertyName("customerPhone") @set:PropertyName("customerPhone")
-    var customerPhone: String = "",
+    @get:PropertyName("appointmentDateTime")
+    val appointmentDateTime: Timestamp = Timestamp.now(),
 
-    @get:PropertyName("customerEmail") @set:PropertyName("customerEmail")
-    var customerEmail: String? = null,
+    @get:PropertyName("customerName")
+    val customerName: String = "",
 
-    @get:PropertyName("createdAt") @set:PropertyName("createdAt")
-    var createdAt: Timestamp = Timestamp.now()
+    @get:PropertyName("customerPhone")
+    val customerPhone: String = "",
+
+    @get:PropertyName("customerEmail")
+    val customerEmail: String? = null,
+
+    @ServerTimestamp
+    @get:PropertyName("createdAt")
+    val createdAt: Date? = null
 )

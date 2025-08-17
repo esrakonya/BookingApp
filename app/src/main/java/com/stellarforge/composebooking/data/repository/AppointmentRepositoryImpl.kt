@@ -44,9 +44,9 @@ class AppointmentRepositoryImpl @Inject constructor(
             .flowOn(ioDispatcher) // 4. Tüm akışın belirtilen dispatcher'da çalışmasını sağla.
     }
 
-    override suspend fun getAppointmentsForDate(date: LocalDate): Result<List<Appointment>> {
+    override suspend fun getAppointmentsForDate(ownerId: String, date: LocalDate): Result<List<Appointment>> {
         return withContext(ioDispatcher) {
-            appointmentDataSource.getAppointmentsForDate(date)
+            appointmentDataSource.getAppointmentsForDate(ownerId, date)
         }
     }
 
@@ -72,6 +72,28 @@ class AppointmentRepositoryImpl @Inject constructor(
     ): Result<Unit> {
         return withContext(ioDispatcher) {
             appointmentDataSource.createAppointmentWithId(ref, appointment)
+        }
+    }
+
+    override fun getOwnerServicesStream(ownerId: String): Flow<Result<List<Service>>> {
+        return serviceDataSource.getOwnerServicesStream(ownerId).flowOn(ioDispatcher)
+    }
+
+    override suspend fun addService(service: Service): Result<Unit> {
+        return withContext(ioDispatcher){
+            serviceDataSource.addService(service)
+        }
+    }
+
+    override suspend fun updateService(service: Service): Result<Unit> {
+        return withContext(ioDispatcher) {
+            serviceDataSource.updateService(service)
+        }
+    }
+
+    override suspend fun deleteService(serviceId: String): Result<Unit> {
+        return withContext(ioDispatcher) {
+            serviceDataSource.deleteService(serviceId)
         }
     }
 

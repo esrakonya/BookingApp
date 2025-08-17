@@ -3,6 +3,7 @@ package com.stellarforge.composebooking.domain.usecase
 import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.data.repository.SlotRepository
 import com.stellarforge.composebooking.utils.BusinessConstants
+import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -27,9 +28,13 @@ class GetAvailableSlotsUseCase @Inject constructor(
     operator fun invoke(date: LocalDate, serviceDuration: Int): Flow<Result<List<LocalTime>>> = flow {
         Timber.d("GetAvailableSlotsUseCase: Invoked for date: $date, duration: $serviceDuration")
         emit(Result.Loading)
+
+        // Müşteri tarafı olduğu için, her zaman sabit işletme ID'sini kullanıyoruz.
+        val targetOwnerId = FirebaseConstants.TARGET_BUSINESS_OWNER_ID
+
         try {
             // 2. Repository'den o güne ait dolu slotları al
-            when (val slotsResult = slotRepository.getSlotsForDate(date)) {
+            when (val slotsResult = slotRepository.getSlotsForDate(targetOwnerId, date)) {
                 is Result.Success -> {
                     val bookedSlots = slotsResult.data
                     Timber.d("UseCase: Fetched ${bookedSlots.size} booked slots for date: $date")

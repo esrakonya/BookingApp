@@ -26,7 +26,7 @@ interface AppointmentRepository {
      * @return Randevu listesini veya hatayı içeren bir Result<List<Appointment>>.
      *         Bu fonksiyon suspend veya Flow olabilir. Suspend daha basit olabilir.
      */
-    suspend fun getAppointmentsForDate(date: LocalDate): Result<List<Appointment>>
+    suspend fun getAppointmentsForDate(ownerId: String, date: LocalDate): Result<List<Appointment>>
 
     /**
      * Yeni bir randevu oluşturur.
@@ -43,4 +43,29 @@ interface AppointmentRepository {
     fun getNewAppointmentReference(): DocumentReference
 
     suspend fun createAppointmentWithId(ref: DocumentReference, appointment: Appointment): Result<Unit>
+
+    /**
+     * İŞLETME SAHİBİ için: Belirli bir işletme sahibine ait TÜM servisleri (aktif/pasif) dinler.
+     * Bu, işletme sahibinin "Servisleri Yönet" ekranı için kullanılacak.
+     * @param ownerId İşletme sahibinin UID'si.
+     */
+    fun getOwnerServicesStream(ownerId: String): Flow<Result<List<Service>>>
+
+    /**
+     * Yeni bir servis ekler.
+     * @param service Eklenecek servis verisi.
+     */
+    suspend fun addService(service: Service): Result<Unit>
+
+    /**
+     * Mevcut bir servisi günceller.
+     * @param service Güncellenmiş servis verisi.
+     */
+    suspend fun updateService(service: Service): Result<Unit>
+
+    /**
+     * Bir servisi ID'sini kullanarak siler.
+     * @param serviceId Silinecek servisin ID'si.
+     */
+    suspend fun deleteService(serviceId: String): Result<Unit>
 }

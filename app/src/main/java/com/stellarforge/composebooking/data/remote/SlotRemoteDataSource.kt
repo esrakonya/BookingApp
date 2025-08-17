@@ -14,11 +14,10 @@ import java.time.ZoneId
 import javax.inject.Inject
 
 class SlotRemoteDataSource @Inject constructor(
-    private val firestore: FirebaseFirestore,
-    private val firebaseConstants: FirebaseConstants
+    private val  firestore: FirebaseFirestore
 ) {
 
-    private val slotsCollection: CollectionReference = firestore.collection(firebaseConstants.BOOKED_SLOTS_COLLECTION)
+    private val slotsCollection: CollectionReference = firestore.collection(FirebaseConstants.BOOKED_SLOTS_COLLECTION)
 
     /**
      * Yeni bir BookedSlot belgesini Firestore'a ekler.
@@ -38,7 +37,7 @@ class SlotRemoteDataSource @Inject constructor(
      * Sadece başlangıç ve bitiş zamanlarını içeren slotları getirir.
      * Başlangıç zamanına göre sıralar.
      */
-    suspend fun getSlotsForDate(date: LocalDate): Result<List<BookedSlot>> {
+    suspend fun getSlotsForDate(ownerId: String, date: LocalDate): Result<List<BookedSlot>> {
         return try {
             val zoneId = ZoneId.systemDefault()
             val startOfDay = date.atStartOfDay(zoneId).toInstant()
@@ -52,17 +51,19 @@ class SlotRemoteDataSource @Inject constructor(
             // Daha basit: Başlangıç zamanı o gün olanları alalım.
             // (Gün aşan randevular varsa bu sorgu yetmeyebilir, ama şimdilik yeterli)
             val snapshot = slotsCollection
+                .whereEqualTo("ownerId", ownerId) // <-- YENİ FİLTRE
                 .whereGreaterThanOrEqualTo("startTime", startTimestamp)
-                .whereLessThan("startTime", endTimestamp) // O gün başlayanlar
+                .whereLessThan("startTime", endTimestamp)
                 .orderBy("startTime", Query.Direction.ASCENDING)
                 .get()
                 .await()
 
-            val slots = snapshot.toObjects<BookedSlot>()
-            // ID atamaya gerek yok, sadece zaman bilgisi lazım.
+            val slots = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(BookedSlot::class.java)?.copy(id = doc.id)
+            }
             Result.Success(slots)
         } catch (e: Exception) {
-            Result.Error(e)
+            Result.Error(e, "Dolu saatler alınamadı.")
         }
     }
 
@@ -74,14 +75,13 @@ class SlotRemoteDataSource @Inject constructor(
         return try {
             val querySnapshot = slotsCollection.whereEqualTo("appointmentId", appointmentId).get().await()
             if (!querySnapshot.isEmpty) {
-                // Genellikle tek bir sonuç beklenir.
                 for (document in querySnapshot.documents) {
                     document.reference.delete().await()
                 }
             }
             Result.Success(Unit)
         } catch (e: Exception) {
-            Result.Error(e)
+            Result.Error(e, "Slot silinemedi.")
         }
     }
 
