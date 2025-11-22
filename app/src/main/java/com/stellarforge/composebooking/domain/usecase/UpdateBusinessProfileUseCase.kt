@@ -2,8 +2,8 @@ package com.stellarforge.composebooking.domain.usecase
 
 import com.google.firebase.Timestamp
 import com.stellarforge.composebooking.data.model.BusinessProfile
-import com.stellarforge.composebooking.data.repository.AuthRepository
-import com.stellarforge.composebooking.data.repository.BusinessProfileRepository
+import com.stellarforge.composebooking.domain.repository.AuthRepository
+import com.stellarforge.composebooking.domain.repository.BusinessProfileRepository
 import com.stellarforge.composebooking.utils.Result
 import timber.log.Timber
 import javax.inject.Inject

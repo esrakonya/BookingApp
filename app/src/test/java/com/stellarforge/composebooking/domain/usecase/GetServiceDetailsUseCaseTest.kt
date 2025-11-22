@@ -1,93 +1,108 @@
 package com.stellarforge.composebooking.domain.usecase
 
+import com.google.common.truth.Truth.assertThat
 import com.stellarforge.composebooking.data.model.Service
-import com.stellarforge.composebooking.data.repository.AppointmentRepository
+import com.stellarforge.composebooking.domain.repository.AppointmentRepository
+import com.stellarforge.composebooking.utils.DocumentNotFoundException
 import com.stellarforge.composebooking.utils.Result
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.mockk
-import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertNotNull
-import junit.framework.TestCase.assertTrue
+import io.mockk.impl.annotations.RelaxedMockK
+import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 class GetServiceDetailsUseCaseTest {
-     private lateinit var mockRepository: AppointmentRepository
 
-     // Test edilecek sınıfın örneği
+    @get:Rule
+    val mockkRule = MockKRule(this)
+
+    @RelaxedMockK
+    private lateinit var mockRepository: AppointmentRepository
+
+
      private lateinit var getServiceDetailsUseCase: GetServiceDetailsUseCase
 
-     // Her testten önce çalışacak kurulum fonksiyonu
      @Before
      fun setUp() {
-         // Repository'i mockla
-         mockRepository = mockk()
-
          // Use case'i mock repository ile oluştur
          getServiceDetailsUseCase = GetServiceDetailsUseCase(mockRepository)
      }
 
     @Test
-    fun `invoke() when repository returns success should return success with service`() = runTest {
+    fun `invoke - with valid serviceId - when repository returns success - should return success with service`() = runTest {
         val fakeServiceId = "test-id-123"
         val expectedService = Service(
             id = fakeServiceId,
+            ownerId = "owner-1",
             name = "Test Service",
             description = "Desc",
             durationMinutes = 60,
-            price = 50.0,
+            priceInCents = 5000L,
             isActive = true
         )
 
-        val successResult: Result<Service> = Result.Success(expectedService)
-
-        coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns successResult
+        coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns Result.Success(expectedService)
 
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
-        assertTrue("Result should be an instance of Result.Success", actualResult is Result.Success)
+        assertThat(actualResult).isInstanceOf(Result.Success::class.java)
         val serviceData = (actualResult as Result.Success).data
-        assertEquals(expectedService, serviceData)
+        assertThat(serviceData).isNotNull()
+        assertThat(serviceData).isEqualTo(expectedService)
 
         coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
     }
 
     @Test
-    fun `invoke() when repository returns error should return error`() = runTest {
-        val fakeServiceId = "test-id-404"
-        val expectedException = Exception("Service not found in mock")
-        val failureResult: Result<Service> = Result.Error(expectedException)
-
-        coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns failureResult
+    fun `invoke - with a non-existent serviceId - when repository returns DocumentNotFoundException - should return Success with null data`() = runTest {
+        val fakeServiceId = "non-existent-id"
+        coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns Result.Error(DocumentNotFoundException("Not Found"))
 
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
-        assertTrue("Result should be an instance of Result.Error", actualResult is Result.Error)
+        assertThat(actualResult).isInstanceOf(Result.Success::class.java)
+        val serviceData = (actualResult as Result.Success).data
+        assertThat(serviceData).isNull()
+
+        coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
+    }
+
+    @Test
+    fun `invoke - when repository returns a general error - should pass the error through`() = runTest {
+        // ARRANGE: Repository'nin genel bir veritabanı hatası döndüreceğini ayarla
+        val fakeServiceId = "test-id-error"
+        val genericException = Exception("Firestore connection failed")
+        coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns Result.Error(genericException)
+
+        // ACT: UseCase'i çalıştır
+        val actualResult = getServiceDetailsUseCase(fakeServiceId)
+
+        // ASSERT: UseCase'in, "bulunamadı" DIŞINDAKİ hataları değiştirmeden, olduğu gibi ilettiğini doğrula
+        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
         val actualException = (actualResult as Result.Error).exception
-        assertEquals(expectedException, actualException)
+        assertThat(actualException).isEqualTo(genericException)
 
         coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
     }
 
     @Test
-    fun `invoke() when repository throws exception should return failure wrapping the exception`() = runTest {
-        val fakeServiceId = "test-id-err"
-        val expectedCause = RuntimeException("Firestore error")
+    fun `invoke - with a blank serviceId - should return illegal argument error without calling repository`() = runTest {
+        // ARRANGE: Geçersiz (boş) bir ID hazırla
+        val blankServiceId = " "
 
-        coEvery { mockRepository.getServiceDetails(fakeServiceId) } throws expectedCause
+        // ACT: UseCase'i geçersiz ID ile çalıştır
+        val actualResult = getServiceDetailsUseCase(blankServiceId)
 
-        val actualResult = getServiceDetailsUseCase(fakeServiceId)
+        // ASSERT: Sonucun beklenen validasyon hatası olduğunu doğrula
+        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
+        val exception = (actualResult as Result.Error).exception
+        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(exception.message).isEqualTo("Service ID cannot be blank.")
 
-        assertTrue("Result should be an instance of Result.Error when repository throws", actualResult is Result.Error)
-
-        val errorResult = actualResult as Result.Error
-        val wrappedException = errorResult.exception
-
-        assertNotNull("Exception should not be null in Error result", wrappedException)
-        assertEquals(expectedCause, wrappedException)
-
-        coVerify(exactly = 1) { mockRepository.getServiceDetails(fakeServiceId) }
+        // Repository'nin HİÇ çağrılmadığını doğrula
+        coVerify(exactly = 0) { mockRepository.getServiceDetails(any()) }
     }
 }

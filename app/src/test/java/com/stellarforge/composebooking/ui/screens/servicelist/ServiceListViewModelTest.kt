@@ -1,12 +1,11 @@
 // ServiceListViewModelTest.kt
 
-import android.util.Log
 import app.cash.turbine.test
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.model.Service
-import com.stellarforge.composebooking.data.repository.AppointmentRepository
+import com.stellarforge.composebooking.domain.repository.AppointmentRepository
 import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.domain.usecase.SignOutUseCase

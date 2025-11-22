@@ -8,6 +8,8 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.domain.usecase.SignInUseCase
+import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
+import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.utils.ValidationUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,13 +34,14 @@ data class LoginUiState(
 )
 
 sealed interface LoginViewEvent {
-    object NavigateToServiceList : LoginViewEvent
+    data class NavigateTo(val route: String) : LoginViewEvent
     data class ShowSnackbar(@StringRes val messageId: Int): LoginViewEvent
 }
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val signInUseCase: SignInUseCase
+    private val signInUseCase: SignInUseCase,
+    private val signOutUseCase: SignOutUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -107,12 +110,23 @@ class LoginViewModel @Inject constructor(
             // SignInUseCase'in `suspend operator fun invoke(...): Result<AuthUser>` döndürdüğünü varsayıyoruz.
             when (val result = signInUseCase(email, password)) {
                 is Result.Success -> {
-                    // Başarılı giriş, result.data AuthUser nesnesini içerir.
-                    // Bu data'nın null olup olmadığını kontrol etmeye gerek yok,
-                    // çünkü SignInUseCase'den Result<AuthUser> (nullable olmayan AuthUser) bekliyoruz.
-                    Timber.i("Sign in successful for user: ${result.data.uid} - ${result.data.email}")
-                    _uiState.update { it.copy(isLoading = false) }
-                    _eventFlow.emit(LoginViewEvent.NavigateToServiceList)
+                    val user = result.data
+
+                    // --- YENİ ROL KONTROLÜ ---
+                    if (user.role == "customer") {
+                        // Rol doğru (müşteri), devam et.
+                        Timber.i("Customer sign in successful for: ${user.uid}")
+                        _uiState.update { it.copy(isLoading = false) }
+                        _eventFlow.emit(LoginViewEvent.NavigateTo(ScreenRoutes.ServiceList.route))
+                    } else {
+                        // Rol yanlış (işletme sahibi müşteri girişinden girmeye çalışıyor).
+                        Timber.w("Owner (role=${user.role}) attempted to sign in via customer login.")
+                        _uiState.update { it.copy(isLoading = false) }
+                        // Yeni bir hata mesajı için strings.xml'e ekleme yapmamız gerekecek.
+                        _eventFlow.emit(LoginViewEvent.ShowSnackbar(R.string.error_auth_owner_at_customer_login))
+                        // Çıkış yaptırarak Auth state'ini temizlemek iyi bir pratiktir.
+                        signOutUseCase()
+                    }
                 }
                 is Result.Error -> {
                     // Hatalı giriş, result.exception ve result.message kullanılabilir
@@ -125,6 +139,7 @@ class LoginViewModel @Inject constructor(
                         else -> R.string.error_login_failed // Diğer genel hatalar
                     }
                     _uiState.update { it.copy(isLoading = false, generalErrorRes = errorRes) }
+                    _eventFlow.emit(LoginViewEvent.ShowSnackbar(errorRes))
                 }
                 is Result.Loading -> {
                     // Bu case'in `suspend fun` bir UseCase için çalışması beklenmez.

@@ -6,16 +6,19 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -25,7 +28,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
+import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,35 +49,26 @@ fun BusinessProfileScreen(
     val logoUrl by viewModel.logoUrl.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var showSignOutDialog by remember { mutableStateOf(false) }
 
-    // Başarı veya hata mesajları için Snackbar gösterimini yöneten LaunchedEffect'ler
-    LaunchedEffect(uiState.updateSuccessMessage) {
-        uiState.updateSuccessMessage?.let { message ->
-            snackbarHostState.showSnackbar(
-                message = message,
-                duration = SnackbarDuration.Short
-            )
-            viewModel.clearUpdateMessages() // Mesaj gösterildikten sonra temizle
+    LaunchedEffect(key1 = true) {
+        viewModel.eventFlow.collectLatest { event ->
+            when (event) {
+                BusinessProfileEvent.NavigateToLogin -> {
+                    navController.navigate(ScreenRoutes.Login.route) {
+                        popUpTo(0)
+                    }
+                }
+            }
         }
     }
-    LaunchedEffect(uiState.updateErrorMessage) {
-        uiState.updateErrorMessage?.let { message ->
-            snackbarHostState.showSnackbar(
-                message = message,
-                duration = SnackbarDuration.Long,
-                withDismissAction = true
-            )
+
+    LaunchedEffect(uiState.updateSuccessMessage, uiState.updateErrorMessage, uiState.loadErrorMessage) {
+        val message = uiState.updateSuccessMessage ?: uiState.updateErrorMessage ?: uiState.loadErrorMessage
+        if (message != null) {
+            scope.launch { snackbarHostState.showSnackbar(message) }
             viewModel.clearUpdateMessages()
-        }
-    }
-    LaunchedEffect(uiState.loadErrorMessage) {
-        uiState.loadErrorMessage?.let { message ->
-            snackbarHostState.showSnackbar(
-                message = message,
-                duration = SnackbarDuration.Long,
-                withDismissAction = true
-            )
-            // Yükleme hatası mesajını temizlemek için bir mekanizma eklenebilir
         }
     }
 
@@ -78,46 +76,22 @@ fun BusinessProfileScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(id = R.string.screen_title_business_profile)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
+                actions = {
+                    IconButton(onClick = { showSignOutDialog = true }) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_navigate_back)
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = stringResource(R.string.profile_sign_out)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                )
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            // "Kaydet" butonu, her zaman altta ve görünür olacak şekilde
-            Surface(tonalElevation = 4.dp, shadowElevation = 4.dp) {
-                Button(
-                    onClick = { viewModel.saveBusinessProfile() },
-                    enabled = !uiState.isUpdatingProfile && !uiState.isLoadingProfile,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
-                        .height(48.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    if (uiState.isUpdatingProfile) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(
-                            stringResource(R.string.button_save_profile),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                }
-            }
+            AppBottomNavigationBar(
+                navController = navController,
+                userRole = "owner"
+            )
         }
     ) { paddingValues ->
         Box(
@@ -135,7 +109,8 @@ fun BusinessProfileScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
+                        .padding(16.dp)
+                        .imePadding(),
                     verticalArrangement = Arrangement.spacedBy(24.dp) // Kartlar arası dikey boşluk
                 ) {
                     // Temel Bilgiler Kartı
@@ -213,9 +188,34 @@ fun BusinessProfileScreen(
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done)
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
         }
+    }
+
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = { Text(stringResource(R.string.dialog_sign_out_title)) },
+            text = { Text(stringResource(R.string.dialog_sign_out_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutDialog = false
+                        viewModel.signOut()
+                    }
+                ) {
+                    Text(stringResource(R.string.profile_sign_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 

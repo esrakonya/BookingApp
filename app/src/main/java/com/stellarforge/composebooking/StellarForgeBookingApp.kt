@@ -12,10 +12,6 @@ class StellarForgeBookingApp : Application() {
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
-            Timber.d("Timber initialized for DEBUG build.")
-        } else {
-            // Release mode: No Timber.DebugTree planted. Plant a custom tree for crash reporting if needed.
-            Timber.i("Timber not initialized for RELEASE build or custom tree planted.")
         }
     }
 }

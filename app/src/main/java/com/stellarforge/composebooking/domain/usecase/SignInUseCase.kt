@@ -1,7 +1,7 @@
 package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.AuthUser
-import com.stellarforge.composebooking.data.repository.AuthRepository
+import com.stellarforge.composebooking.domain.repository.AuthRepository
 import com.stellarforge.composebooking.utils.Result
 import javax.inject.Inject
 

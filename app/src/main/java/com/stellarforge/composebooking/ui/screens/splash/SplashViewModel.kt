@@ -3,7 +3,9 @@ package com.stellarforge.composebooking.ui.screens.splash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
+import com.stellarforge.composebooking.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +16,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val firebaseAuth: FirebaseAuth
+    private val getCurrentUserUseCase: GetCurrentUserUseCase
 ) : ViewModel() {
 
     private val _startDestination = MutableStateFlow<String?>(null)
@@ -25,14 +27,39 @@ class SplashViewModel @Inject constructor(
 
     init {
         Timber.d("SplashViewModel initialized.")
-        // Listener'ı sadece bir kez attach et
-        if (!listenerAttached) {
-            setupAndAttachAuthStateListener()
-            listenerAttached = true
+        determineStartDestination()
+    }
+
+    private fun determineStartDestination() {
+        if (_startDestination.value != null) return
+
+        viewModelScope.launch {
+            when (val result = getCurrentUserUseCase()) {
+                is Result.Success -> {
+                    val authUser = result.data
+                    if (authUser != null && authUser.uid.isNotBlank()) {
+                        Timber.i("User authenticated. UID: ${authUser.uid}, Role: ${authUser.role}")
+
+                        _startDestination.value = if (authUser.role == "owner") {
+                            ScreenRoutes.Schedule.route
+                        } else {
+                            ScreenRoutes.ServiceList.route
+                        }
+                    } else {
+                        Timber.i("No authenticated user found. Navigate to Login.")
+                        _startDestination.value = ScreenRoutes.Login.route
+                    }
+                }
+                is Result.Error -> {
+                    Timber.e(result.exception, "Error checking user authentication.")
+                    _startDestination.value = ScreenRoutes.Login.route
+                }
+                is Result.Loading -> {}
+            }
         }
     }
 
-    private fun setupAndAttachAuthStateListener() {
+    /*private fun setupAndAttachAuthStateListener() {
         authStateListener = FirebaseAuth.AuthStateListener { auth ->
             // Bu listener ana thread'de çağrılabilir, ancak UI güncellemeleri için
             // viewModelScope kullanmak iyi bir pratiktir, özellikle token alma gibi
@@ -73,9 +100,9 @@ class SplashViewModel @Inject constructor(
         }
         firebaseAuth.addAuthStateListener(authStateListener!!)
         Timber.d("AuthStateListener attached.")
-    }
+    }*/
 
-    override fun onCleared() {
+    /*override fun onCleared() {
         super.onCleared()
         authStateListener?.let {
             firebaseAuth.removeAuthStateListener(it)
@@ -83,5 +110,5 @@ class SplashViewModel @Inject constructor(
         }
         listenerAttached = false
         authStateListener = null
-    }
+    }*/
 }

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.snapshots
 import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.data.remote.BusinessProfileRemoteDataSource
 import com.stellarforge.composebooking.di.IoDispatcher
+import com.stellarforge.composebooking.domain.repository.BusinessProfileRepository
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.CoroutineDispatcher

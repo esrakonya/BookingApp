@@ -1,10 +1,10 @@
-package com.stellarforge.composebooking.data.repository
+package com.stellarforge.composebooking.domain.repository
 
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.data.model.Service
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
-import com.google.firebase.firestore.DocumentReference
+import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.utils.Result
 
 /**
@@ -21,28 +21,11 @@ interface AppointmentRepository {
     fun getServices(): Flow<Result<List<Service>>>
 
     /**
-     * Belirli bir tarihteki randevuları getirir.
-     * @param date Randevuların alınacağı tarih.
-     * @return Randevu listesini veya hatayı içeren bir Result<List<Appointment>>.
-     *         Bu fonksiyon suspend veya Flow olabilir. Suspend daha basit olabilir.
-     */
-    suspend fun getAppointmentsForDate(ownerId: String, date: LocalDate): Result<List<Appointment>>
-
-    /**
-     * Yeni bir randevu oluşturur.
-     */
-    suspend fun createAppointment(appointment: Appointment): Result<Unit>
-
-    /**
      * Belirtilen ID'ye sahip tek bir servisin detaylarını getirir.
      * @param serviceId Getirilecek servisin ID'si.
      * @return Servis detayını veya hatayı içeren bir Result<Service>.
      */
     suspend fun getServiceDetails(serviceId: String): Result<Service>
-
-    fun getNewAppointmentReference(): DocumentReference
-
-    suspend fun createAppointmentWithId(ref: DocumentReference, appointment: Appointment): Result<Unit>
 
     /**
      * İŞLETME SAHİBİ için: Belirli bir işletme sahibine ait TÜM servisleri (aktif/pasif) dinler.
@@ -68,4 +51,41 @@ interface AppointmentRepository {
      * @param serviceId Silinecek servisin ID'si.
      */
     suspend fun deleteService(serviceId: String): Result<Unit>
+
+
+
+    /**
+     * Belirli bir tarihteki randevuları getirir.
+     * @param date Randevuların alınacağı tarih.
+     * @return Randevu listesini veya hatayı içeren bir Result<List<Appointment>>.
+     *         Bu fonksiyon suspend veya Flow olabilir. Suspend daha basit olabilir.
+     */
+    suspend fun getAppointmentsForDate(ownerId: String, date: LocalDate): Result<List<Appointment>>
+
+    /**
+     * Belirli bir kullanıcıya ait tüm randevuları dinler.
+     * @param userId Randevuları listelenecek müşterinin UID'si.
+     */
+    fun getMyBookingsStream(userId: String): Flow<Result<List<Appointment>>>
+
+    /**
+     * Bir randevuyu ID'sini kullanarak siler.
+     * @param appointmentId Silinecek randevunun ID'si.
+     */
+    suspend fun deleteAppointment(appointmentId: String): Result<Unit>
+
+
+
+    suspend fun createAppointmentAndSlot(appointment: Appointment, slot: BookedSlot): Result<Unit>
+
+
+
+
+
+
+
+
+
+
+
 }

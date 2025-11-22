@@ -10,6 +10,7 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser // AuthUser importu
 import com.stellarforge.composebooking.domain.usecase.SignUpUseCase
+import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import com.stellarforge.composebooking.utils.Result // KENDİ Result.kt dosyanın importu
 import com.stellarforge.composebooking.utils.ValidationUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,7 +37,7 @@ data class SignUpUiState(
 )
 
 sealed interface SignUpViewEvent {
-    object NavigateToServiceList : SignUpViewEvent
+    data class NavigateTo(val route: String) : SignUpViewEvent
     data class ShowSnackbar(@StringRes val messageResId: Int) : SignUpViewEvent
 }
 
@@ -128,12 +129,12 @@ class SignUpViewModel @Inject constructor(
         viewModelScope.launch {
             Timber.d("Attempting sign up for email: $email")
             // SignUpUseCase'in `suspend operator fun invoke(...): Result<AuthUser>` döndürdüğünü varsayıyoruz.
-            when (val result = signUpUseCase(email, password)) {
+            when (val result = signUpUseCase(email, password, role = "customer")) {
                 is Result.Success -> {
                     // Başarılı kayıt, result.data AuthUser nesnesini içerir.
                     Timber.i("Sign up successful for user: ${result.data.uid} - ${result.data.email}")
                     _uiState.update { it.copy(isLoading = false) }
-                    _eventFlow.emit(SignUpViewEvent.NavigateToServiceList)
+                    _eventFlow.emit(SignUpViewEvent.NavigateTo(route = ScreenRoutes.ServiceList.route))
                 }
                 is Result.Error -> {
                     // Hatalı kayıt, result.exception ve result.message kullanılabilir

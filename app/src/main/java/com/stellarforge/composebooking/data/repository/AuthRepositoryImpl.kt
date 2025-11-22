@@ -4,6 +4,7 @@ import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.remote.AuthRemoteDataSource
 import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.di.IoDispatcher
+import com.stellarforge.composebooking.domain.repository.AuthRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -37,10 +38,11 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun signUpWithEmailPassword(
         email: String,
-        password: String
+        password: String,
+        role: String
     ): Result<AuthUser> {
         return withContext(ioDispatcher) {
-            authRemoteDataSource.signUpWithEmailPassword(email, password)
+            authRemoteDataSource.signUpWithEmailPassword(email, password, role)
         }
     }
 

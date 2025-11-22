@@ -13,6 +13,16 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
+/**
+ * Dolu zaman aralıkları (slots) için ham veri kaynağı işlemlerini tanımlayan arayüz.
+ */
+interface SlotRemoteDataSource {
+    suspend fun addSlot(slot: BookedSlot): Result<Unit>
+    suspend fun getSlotsForDate(ownerId: String, date: LocalDate): Result<List<BookedSlot>>
+    suspend fun deleteSlotByAppointmentId(appointmentId: String): Result<Unit>
+}
+
+/*
 class SlotRemoteDataSource @Inject constructor(
     private val  firestore: FirebaseFirestore
 ) {
@@ -86,3 +96,5 @@ class SlotRemoteDataSource @Inject constructor(
     }
 
 }
+
+ */

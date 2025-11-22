@@ -7,6 +7,7 @@ import com.stellarforge.composebooking.utils.Result
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.toObject
+import com.stellarforge.composebooking.utils.DocumentNotFoundException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -15,6 +16,22 @@ import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 
+/**
+ * Servis verileri için ham veri kaynağı işlemlerini tanımlayan arayüz.
+ */
+interface ServiceRemoteDataSource {
+    fun getOwnerServicesStream(ownerId: String): Flow<Result<List<Service>>>
+
+    suspend fun addService(service: Service): Result<Unit>
+
+    suspend fun updateService(service: Service): Result<Unit>
+
+    suspend fun deleteService(serviceId: String): Result<Unit>
+
+    suspend fun getServiceDetails(serviceId: String): Result<Service>
+}
+
+/*
 /**
  * Servis verileriyle ilgili Firebase Firestore işlemlerini yürüten veri kaynağı sınıfı.
  */
@@ -122,10 +139,12 @@ class ServiceRemoteDataSource @Inject constructor(
             if (service != null) {
                 Result.Success(service)
             } else {
-                Result.Error(Exception("Service with ID $serviceId not found."))
+                Result.Error(DocumentNotFoundException("Service with ID $serviceId not found."))
             }
         } catch (e: Exception) {
             Result.Error(e)
         }
     }
 }
+
+ */

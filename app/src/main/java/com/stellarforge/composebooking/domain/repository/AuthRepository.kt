@@ -1,4 +1,4 @@
-package com.stellarforge.composebooking.data.repository
+package com.stellarforge.composebooking.domain.repository
 
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.utils.Result
@@ -29,7 +29,7 @@ interface AuthRepository {
      * @param password Kullanıcı şifresi.
      * @return Başarılı kayıt sonrası AuthUser içeren Result, veya hata.
      */
-    suspend fun signUpWithEmailPassword(email: String, password: String): Result<AuthUser>
+    suspend fun signUpWithEmailPassword(email: String, password: String, role: String): Result<AuthUser>
 
     /**
      * Mevcut kullanıcının oturumunu kapatır.

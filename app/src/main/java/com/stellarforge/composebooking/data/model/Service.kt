@@ -20,7 +20,7 @@ data class Service (
     val durationMinutes: Int = 30,
 
     @get:PropertyName("priceInCents")
-    val price: Long = 0L,
+    val priceInCents: Long = 0L,
 
     @get:PropertyName("isActive")
     val isActive: Boolean = true,

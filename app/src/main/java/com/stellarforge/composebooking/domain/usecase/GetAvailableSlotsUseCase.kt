@@ -1,7 +1,7 @@
 package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.BookedSlot
-import com.stellarforge.composebooking.data.repository.SlotRepository
+import com.stellarforge.composebooking.domain.repository.SlotRepository
 import com.stellarforge.composebooking.utils.BusinessConstants
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.Result
@@ -11,9 +11,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import timber.log.Timber
-import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
@@ -25,7 +23,7 @@ class GetAvailableSlotsUseCase @Inject constructor(
     private val slotRepository: SlotRepository // Repository'yi enjekte et
 ) {
     // Use case'i fonksiyon gibi çağırmak için 'operator fun invoke' kullanabiliriz
-    operator fun invoke(date: LocalDate, serviceDuration: Int): Flow<Result<List<LocalTime>>> = flow {
+    operator fun invoke(ownerId: String, date: LocalDate, serviceDuration: Int): Flow<Result<List<LocalTime>>> = flow {
         Timber.d("GetAvailableSlotsUseCase: Invoked for date: $date, duration: $serviceDuration")
         emit(Result.Loading)
 

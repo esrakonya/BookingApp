@@ -3,6 +3,7 @@ package com.stellarforge.composebooking.data.repository
 import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.data.remote.SlotRemoteDataSource
 import com.stellarforge.composebooking.di.IoDispatcher
+import com.stellarforge.composebooking.domain.repository.SlotRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.withContext

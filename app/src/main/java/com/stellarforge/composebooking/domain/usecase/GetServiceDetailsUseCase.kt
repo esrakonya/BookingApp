@@ -1,22 +1,37 @@
 package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.Service
-import com.stellarforge.composebooking.data.repository.AppointmentRepository
+import com.stellarforge.composebooking.domain.repository.ServiceRepository
+import com.stellarforge.composebooking.utils.DocumentNotFoundException
 import com.stellarforge.composebooking.utils.Result
-import timber.log.Timber
 import javax.inject.Inject
 
 class GetServiceDetailsUseCase @Inject constructor(
-    private val repository: AppointmentRepository
+    private val serviceRepository: ServiceRepository
 ) {
-    suspend operator fun invoke(serviceId: String): Result<Service> {
-        return try {
-            repository.getServiceDetails(serviceId) // Bu zaten Result döndürüyor
-        } catch (e: Exception) {
-            // Eğer repository.getServiceDetails kendisi bir exception fırlatırsa
-            // (Normalde Result döndürmeli ama garantiye alalım)
-            Timber.e("GerServiceDetailsUseCase: Caught unexpected exception: ${e.message}")
-            Result.Error(e) // Hatayı Result.failure olarak döndür
+    /**
+     * @return Servis detayını, bulunamazsa null içeren bir Result.
+     *         "Bulunamadı" durumu `Success(null)` olarak, diğer hatalar `Error` olarak döner.
+     */
+    suspend operator fun invoke(serviceId: String): Result<Service?> {
+        if (serviceId.isBlank()) {
+            return Result.Error(IllegalArgumentException("Service ID cannot be blank."))
+        }
+
+        when (val result = serviceRepository.getServiceDetails(serviceId)) {
+            is Result.Success -> {
+                return Result.Success(result.data)
+            }
+
+            is Result.Error -> {
+                return if (result.exception is DocumentNotFoundException) {
+                    Result.Success(null)
+                } else {
+                    Result.Error(result.exception)
+                }
+            }
+
+            is Result.Loading -> return Result.Loading
         }
     }
 }

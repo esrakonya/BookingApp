@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
+import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
 import com.stellarforge.composebooking.domain.usecase.UpdateBusinessProfileUseCase
 import com.stellarforge.composebooking.utils.Result // Kendi Result sarmalayıcın
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,17 +15,37 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * BusinessProfileScreen'in kullanıcı arayüzü durumunu temsil eder.
+ */
+data class BusinessProfileUiState(
+    val isLoadingProfile: Boolean = true,
+    val profileData: BusinessProfile? = null,
+    val loadErrorMessage: String? = null,
+
+    val isUpdatingProfile: Boolean = false,
+    val updateSuccessMessage: String? = null,
+    val updateErrorMessage: String? = null
+)
+
+sealed interface BusinessProfileEvent {
+    object NavigateToLogin: BusinessProfileEvent
+}
 
 @OptIn(ExperimentalCoroutinesApi::class) // Sınıf seviyesinde OptIn
 @HiltViewModel
 class BusinessProfileViewModel @Inject constructor(
     private val getBusinessProfileUseCase: GetBusinessProfileUseCase,
     private val updateBusinessProfileUseCase: UpdateBusinessProfileUseCase,
-    private val getCurrentUserUseCase: GetCurrentUserUseCase
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val signOutUseCase: SignOutUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BusinessProfileUiState())
     val uiState: StateFlow<BusinessProfileUiState> = _uiState.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<BusinessProfileEvent>()
+    val eventFlow = _eventFlow.asSharedFlow()
 
     // Form alanları için ayrı MutableStateFlow'lar
     // Bunlar Composable ekranındaki TextField'larla iki yönlü veri bağlaması için kullanılacak.
@@ -291,5 +312,12 @@ class BusinessProfileViewModel @Inject constructor(
     fun clearUpdateMessages() {
         Timber.d("BusinessProfileViewModel: Clearing update messages.")
         _uiState.update { it.copy(updateSuccessMessage = null, updateErrorMessage = null) }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            signOutUseCase()
+            _eventFlow.emit(BusinessProfileEvent.NavigateToLogin)
+        }
     }
 }

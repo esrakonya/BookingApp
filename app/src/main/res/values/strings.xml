@@ -135,4 +135,75 @@
     <string name="header_location_info">Konum Bilgileri</string>
     <string name="header_basic_info">Temel Bilgiler</string>
 
+    <string name="booking_screen_price_label">Fiyat</string>
+    <string name="booking_screen_email_placeholder">ornek@eposta.com</string>
+
+    <!-- Manage Services Screen -->
+    <string name="manage_services_screen_title">Servisleri Yönet</string>
+    <string name="manage_services_add_service">Yeni Servis Ekle</string>
+    <string name="manage_services_edit_service">Servisi Düzenle</string>
+    <string name="manage_services_delete_service">Servisi Sil</string>
+    <string name="manage_services_inactive_label">Pasif</string>
+    <string name="manage_services_empty_state">Henüz hiç servis eklemediniz.\nYeni bir servis eklemek için + butonuna dokunun.</string>
+
+    <!-- Add/Edit Service Screen -->
+    <string name="add_edit_service_save_button">Kaydet</string>
+    <string name="add_edit_service_name_label">Servis Adı *</string>
+    <string name="add_edit_service_name_placeholder">Örn: Saç Kesimi</string>
+    <string name="add_edit_service_description_label">Açıklama</string>
+    <string name="add_edit_service_description_placeholder">Servis hakkında kısa bilgi (opsiyonel)</string>
+    <string name="add_edit_service_duration_label">Süre *</string>
+    <string name="add_edit_service_price_label">Fiyat *</string>
+    <string name="add_edit_service_active_label">Servis Aktif</string>
+
+    <!-- My Bookings Screen -->
+    <string name="my_bookings_screen_title">Randevularım</string>
+    <string name="my_bookings_tab_upcoming">Gelecek</string>
+    <string name="my_bookings_tab_past">Geçmiş</string>
+    <string name="my_bookings_no_upcoming">Gelecekte planlanmış bir randevunuz bulunmuyor.</string>
+    <string name="my_bookings_no_past">Geçmiş bir randevunuz bulunmuyor.</string>
+    <string name="my_bookings_item_date">Tarih</string>
+    <string name="my_bookings_item_time">Saat</string>
+    <string name="my_bookings_item_price">Fiyat</string>
+    <string name="my_bookings_cancel_button">İptal Et</string>
+    <string name="my_bookings_cancellation_success">Randevunuz başarıyla iptal edildi.</string>
+    <string name="my_bookings_cancellation_failed">Randevu iptal edilirken bir hata oluştu.</string>
+
+    <!-- Schedule Screen -->
+    <string name="schedule_screen_title">Program</string>
+    <string name="schedule_screen_no_appointments">Seçilen tarih için planlanmış bir randevu bulunmuyor.</string>
+    
+    
+    <string name="error_auth_not_an_owner">Bu hesap bir işletme hesabı değildir.</string>
+
+    <string name="owner_login_title">İşletme Girişi</string>
+
+    <string name="owner_signup_title">İşletme Hesabı Oluştur</string>
+
+
+    <string name="login_welcome_title">Tekrar Hoş Geldiniz!</string>
+    <string name="login_welcome_subtitle">Devam etmek için bilgilerinizi girin.</string>
+    <string name="login_owner_link">İşletme sahibi misiniz? Buradan giriş yapın.</string>
+
+    <string name="signup_owner_link">İşletme hesabı mı oluşturmak istiyorsunuz? Buradan oluşturun.</string>
+    <string name="signup_customer_link">Müşteri olarak mı kaydolmak istiyorsunuz? Buradan kaydolun.</string>
+
+    <string name="error_auth_owner_at_customer_login">Bu bir işletme sahibi hesabıdır. Lütfen "İşletme Girişi" linkini kullanın.</string>
+    <string name="error_auth_customer_at_owner_login">Bu bir müşteri hesabıdır. Lütfen bir önceki sayfadan giriş yapın.</string>
+
+    <string name="error_user_not_found_generic">Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.</string>
+    <string name="error_services_loading_failed">Servisler yüklenemedi.</string>
+    <string name="error_service_deletion_failed">Servis silinemedi.</string>
+
+    <string name="profile_screen_title">Profile</string>
+    <string name="profile_sign_out">Sign Out</string>
+    <string name="profile_app_version">Android 35</string>
+
+    <!-- Sign Out Dialog -->
+    <string name="dialog_sign_out_title">Çıkış Yap</string>
+    <string name="dialog_sign_out_confirmation">Çıkış yapmak istediğinizden emin misiniz?</string>
+    <string name="action_cancel">İptal</string>
+
+
+
 </resources>

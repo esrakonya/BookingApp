@@ -12,7 +12,7 @@ interface AuthRemoteDataSource {
 
     suspend fun signInWithEmailPassword(email: String, password: String): Result<AuthUser>
 
-    suspend fun signUpWithEmailPassword(email: String, password: String): Result<AuthUser>
+    suspend fun signUpWithEmailPassword(email: String, password: String, role: String): Result<AuthUser>
 
     suspend fun signOut(): Result<Unit>
 }

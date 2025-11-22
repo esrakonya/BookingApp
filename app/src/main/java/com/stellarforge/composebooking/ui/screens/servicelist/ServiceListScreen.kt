@@ -1,7 +1,11 @@
 package com.stellarforge.composebooking.ui.screens.servicelist
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -9,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -21,9 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
-import com.stellarforge.composebooking.ui.components.ServiceList
+import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
+import com.stellarforge.composebooking.ui.components.CustomerServiceListItem
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -70,7 +73,25 @@ fun ServiceListScreen(
                     val businessName by viewModel.businessName.collectAsState()
                     Text(businessName ?: stringResource(id = R.string.service_list_title))
                 },
-                actions = {
+                /*actions = {
+                    IconButton(onClick = {
+                        navController.navigate(ScreenRoutes.MyBookings.route)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = stringResource(id = R.string.my_bookings_screen_title)
+                        )
+                    }
+
+                    IconButton(onClick = {
+                        navController.navigate(ScreenRoutes.Schedule.route)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = stringResource(id = R.string.schedule_screen_title)
+                        )
+                    }
+
                     // YENİ İŞLETME PROFİLİ DÜZENLEME BUTONU
                     IconButton(onClick = {
                         navController.navigate(ScreenRoutes.BusinessProfile.route)
@@ -88,10 +109,13 @@ fun ServiceListScreen(
                             contentDescription = stringResource(id = R.string.sign_out_button_desc)
                         )
                     }
-                }
+                }*/
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            AppBottomNavigationBar(navController = navController, userRole = "customer")
+        }
     ) { paddingValues ->  
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
             when (val state = uiState) {
@@ -121,10 +145,18 @@ fun ServiceListScreen(
                             )
                         }
                     } else {
-                        ServiceList(
-                            services = state.services,
-                            onServiceClick = onServiceClick
-                        )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(items = state.services, key = { it.id }) { service ->
+                                CustomerServiceListItem(
+                                    service = service,
+                                    onClick = { onServiceClick(service.id) }
+                                )
+                            }
+                        }
                     }
                 }
 

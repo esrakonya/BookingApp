@@ -1,7 +1,7 @@
 package com.stellarforge.composebooking.domain.usecase
 
 import com.stellarforge.composebooking.data.model.BusinessProfile
-import com.stellarforge.composebooking.data.repository.BusinessProfileRepository
+import com.stellarforge.composebooking.domain.repository.BusinessProfileRepository
 import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

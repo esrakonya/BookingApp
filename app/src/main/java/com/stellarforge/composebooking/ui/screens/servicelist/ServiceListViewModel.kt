@@ -9,7 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.model.Service
-import com.stellarforge.composebooking.data.repository.AppointmentRepository // VEYA ServiceRepository (projenize göre doğru olanı seçin)
+import com.stellarforge.composebooking.domain.repository.AppointmentRepository // VEYA ServiceRepository (projenize göre doğru olanı seçin)
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase // YENİ
 import com.stellarforge.composebooking.domain.usecase.SignOutUseCase

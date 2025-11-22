@@ -1,12 +1,11 @@
 package com.stellarforge.composebooking.domain.usecase
 
-import com.stellarforge.composebooking.data.repository.AuthRepository
+import com.stellarforge.composebooking.domain.repository.AuthRepository
 import com.stellarforge.composebooking.utils.Result
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
-import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before

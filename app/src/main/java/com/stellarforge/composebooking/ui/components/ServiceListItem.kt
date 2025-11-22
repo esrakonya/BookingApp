@@ -1,5 +1,9 @@
 package com.stellarforge.composebooking.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,9 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -23,84 +33,70 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Service
+import com.stellarforge.composebooking.utils.toFormattedPrice
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServiceListItem(
     service: Service,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    isBeingDeleted: Boolean
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 1.dp,
-        onClick = onClick
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        ListItem(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(all = 16.dp), // ListItem'ın kendi iç padding'i
-            headlineContent = {
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(service.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = service.name,
-                    style = MaterialTheme.typography.titleMedium // Başlık stilini belirginleştir
+                    text = "${service.durationMinutes} dk. - ${service.priceInCents.toFormattedPrice()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            },
-            supportingContent = {
-                Column {
-                    if (service.description.isNotBlank()) {
-                        Text(
-                            service.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2, // Açıklama için 2 satır yeterli olabilir
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant // Biraz daha soluk
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                if (!service.isActive) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(id = R.string.manage_services_inactive_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            // Silme işlemi sırasında butonlar yerine progress indicator göster
+            AnimatedVisibility(
+                visible = isBeingDeleted,
+                enter = fadeIn(animationSpec = tween(100)),
+                exit = fadeOut(animationSpec = tween(100))
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+            }
+            // Silme işlemi yoksa butonları göster
+            AnimatedVisibility(
+                visible = !isBeingDeleted,
+                enter = fadeIn(animationSpec = tween(100)),
+                exit = fadeOut(animationSpec = tween(100))
+            ) {
+                Row {
+                    IconButton(onClick = onEditClick) {
+                        Icon(Icons.Default.Edit, contentDescription = stringResource(id = R.string.manage_services_edit_service))
                     }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween, // Süre ve fiyatı ayırabilir
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.service_list_item_duration, service.durationMinutes),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        Text(
-                            text = stringResource(id = R.string.service_list_item_price, service.price),
-                            style = MaterialTheme.typography.labelLarge, // Fiyatı biraz daha belirgin yap
-                            color = MaterialTheme.colorScheme.primary // Fiyatı ana renkle vurgula
-                        )
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(id = R.string.manage_services_delete_service), tint = MaterialTheme.colorScheme.error)
                     }
                 }
-            },
-            leadingContent = { // Opsiyonel: Sol tarafa bir ikon
-                Icon(
-                    imageVector = Icons.Filled.Menu, // Ya da servise özel bir ikon
-                    contentDescription = null, // Servis adı zaten açıklayıcı
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp) // İkon boyutu
-                )
-            },
-            trailingContent = { // Opsiyonel: Sağ tarafa bir ikon
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.view_details_desc),
-                    tint = MaterialTheme.colorScheme.outline
-                )
             }
-            // ListItem'ın kendi tıklanabilirliğini kaldırabiliriz, çünkü Surface tıklanabilir.
-            // VEYA Surface'ın onClick'ini kaldırıp ListItem'ınkini kullanabiliriz.
-            // Eğer Surface'a onClick verdiysek, ListItem'daki .clickable(onClick = onClick) gereksiz.
-        )
+        }
     }
 }

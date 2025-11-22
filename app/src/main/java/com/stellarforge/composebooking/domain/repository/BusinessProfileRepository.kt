@@ -1,4 +1,4 @@
-package com.stellarforge.composebooking.data.repository
+package com.stellarforge.composebooking.domain.repository
 
 import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.utils.Result

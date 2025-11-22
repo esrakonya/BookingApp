@@ -28,30 +28,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.stellarforge.composebooking.R
-import com.stellarforge.composebooking.ui.components.LoadingIndicator
-import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.YearMonth
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.core.CalendarDay
 import com.kizitonwose.calendar.core.DayPosition
 import com.kizitonwose.calendar.core.daysOfWeek
+import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.data.model.Service
+import com.stellarforge.composebooking.ui.components.LoadingIndicator
+import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation // Bu import'un doğru olduğundan emin ol
+import com.stellarforge.composebooking.utils.toFormattedPrice
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
-
-// ViewModel'dan gelen state ve event'lerin import edildiğini varsayıyoruz.
-// import com.stellarforge.composebooking.ui.screens.booking.BookingViewModel.BookingViewEvent
-// import com.stellarforge.composebooking.ui.screens.booking.BookingUiState
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) // DÜZELTİLDİ: ExperimentalLayoutApi eklendi
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BookingScreen(
     navController: NavController,
@@ -59,33 +55,19 @@ fun BookingScreen(
     onBookingConfirmed: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val eventFlow = viewModel.eventFlow
-
-    var showDatePicker by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    LaunchedEffect(key1 = Unit) {
-        eventFlow.collect { event ->
-            // DÜZELTME: Event'lere tam yoluyla erişelim (ViewModel adıyla)
+    LaunchedEffect(key1 = viewModel.eventFlow) {
+        viewModel.eventFlow.collectLatest { event ->
             when (event) {
                 is BookingViewEvent.NavigateToConfirmation -> {
                     onBookingConfirmed()
                 }
-
                 is BookingViewEvent.ShowSnackbar -> {
-                    val message = if (event.formatArgs.isEmpty()) {
-                        context.getString(event.messageId)
-                    } else {
-                        // Spread operatörü (*) ile format argümanlarını doğru şekilde geçir
-                        context.getString(event.messageId, *event.formatArgs.toTypedArray())
-                    }
-                    // Snackbar'ı göstermek için yeni bir coroutine başlat
-                    // LaunchedEffect scope'u zaten bir coroutine scope'udur, ama
-                    // showSnackbar suspend olduğu için launch kullanmak daha güvenlidir.
                     launch {
                         snackbarHostState.showSnackbar(
-                            message = message,
+                            message = context.getString(event.messageId),
                             duration = SnackbarDuration.Short
                         )
                     }
@@ -94,16 +76,13 @@ fun BookingScreen(
         }
     }
 
-    LaunchedEffect(key1 = Unit) {
-        viewModel.onScreenReady()
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
+                    // DÜZELTİLDİ: Artık uiState.service nesnesinden okunuyor.
                     Text(
-                        text = uiState.serviceName.ifBlank { stringResource(id = R.string.booking_screen_title_default) },
+                        text = uiState.service?.name ?: stringResource(id = R.string.booking_screen_title_default),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -115,43 +94,36 @@ fun BookingScreen(
                             contentDescription = stringResource(id = R.string.action_navigate_back)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
-                )
+                }
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
+            // DÜZELTİLDİ: Butonun 'enabled' durumu yeni UiState'e göre ayarlandı.
+            val isFormValid = uiState.customerName.isNotBlank() && uiState.customerPhone.isNotBlank() && uiState.nameError == null && uiState.phoneError == null
             Surface(tonalElevation = 4.dp, shadowElevation = 4.dp) {
                 Button(
                     onClick = viewModel::confirmBooking,
-                    enabled = !uiState.isLoadingService && !uiState.isBooking &&
-                            uiState.selectedSlot != null &&
-                            uiState.customerName.isNotBlank() &&
-                            uiState.nameErrorRes == null && uiState.phoneErrorRes == null,
+                    enabled = !uiState.isLoadingService && !uiState.isBooking && uiState.selectedSlot != null && isFormValid,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                         .height(52.dp)
                 ) {
                     if (uiState.isBooking) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(stringResource(id = R.string.booking_screen_booking_in_progress))
-                        }
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                     } else {
                         Text(
                             stringResource(id = R.string.booking_screen_confirm_button),
-                            style = MaterialTheme.typography.titleSmall
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
             }
         }
     ) { paddingValues ->
-        if (uiState.isLoadingService && uiState.serviceName.isBlank()) {
+        // DÜZELTİLDİ: Yükleme durumu kontrolü `service` nesnesinin null olup olmadığına bakıyor.
+        if (uiState.isLoadingService && uiState.service == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 LoadingIndicator()
             }
@@ -162,9 +134,12 @@ fun BookingScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(paddingValues)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                ServiceDetailsSection(uiState = uiState)
+                // `service` null değilse detayları göster
+                uiState.service?.let { service ->
+                    ServiceDetailsSection(service = service)
+                }
                 DateTimeSelectionSection(
                     uiState = uiState,
                     onDateSelected = viewModel::onDateSelected,
@@ -173,53 +148,11 @@ fun BookingScreen(
                 CustomerInfoSection(
                     uiState = uiState,
                     onNameChanged = viewModel::onCustomerNameChanged,
-                    onPhoneChanged = { phone ->
-                        val filteredPhone = phone.filter { it.isDigit() }.take(11)
-                        viewModel.onCustomerPhoneChanged(filteredPhone)
-                    }
+                    onPhoneChanged = viewModel::onCustomerPhoneChanged,
+                    onEmailChanged = viewModel::onCustomerEmailChanged
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(64.dp)) // Butonun arkasında kalmasın diye
             }
-        }
-    }
-
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = uiState.selectedDate
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli(),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                    return utcTimeMillis >= LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                }
-                override fun isSelectableYear(year: Int): Boolean {
-                    return year >= LocalDate.now().year && year <= LocalDate.now().year + 1
-                }
-            }
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDatePicker = false
-                        datePickerState.selectedDateMillis?.let { selectedMillis ->
-                            val selectedLocalDate = Instant.ofEpochMilli(selectedMillis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            viewModel.onDateSelected(selectedLocalDate)
-                        }
-                    }
-                ) { Text(stringResource(id = R.string.date_picker_ok)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(id = R.string.date_picker_cancel))
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 }
@@ -227,35 +160,39 @@ fun BookingScreen(
 //--- YARDIMCI COMPOSABLE BİLEŞENLER ---
 
 @Composable
-private fun ServiceDetailsSection(uiState: BookingUiState) {
-    if (uiState.serviceName.isNotBlank()) {
-        SectionCard(
-            title = stringResource(R.string.booking_screen_section_service_details_title),
-            icon = Icons.Filled.Info // DÜZELTİLDİ: InfoOutline yerine Info
-        ) {
+private fun ServiceDetailsSection(service: Service) { // DÜZELTİLDİ: Artık tam bir Service nesnesi alıyor
+    SectionCard(
+        title = stringResource(R.string.booking_screen_section_service_details_title),
+        icon = Icons.Default.ContentCut
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = uiState.serviceName,
+                text = service.name,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
+                color = MaterialTheme.colorScheme.primary
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = stringResource(id = R.string.booking_screen_duration_label),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = stringResource(id = R.string.booking_screen_duration_value, uiState.serviceDuration),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                DetailItem(label = stringResource(id = R.string.booking_screen_duration_label), value = stringResource(id = R.string.booking_screen_duration_value, service.durationMinutes))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                DetailItem(label = stringResource(id = R.string.booking_screen_price_label), value = service.priceInCents.toFormattedPrice())
             }
         }
     }
+}
+
+@Composable
+private fun DetailItem(label: String, value: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Text(
+        text = value,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Bold
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -269,19 +206,16 @@ private fun DateTimeSelectionSection(
         title = stringResource(R.string.booking_screen_section_datetime_title),
         icon = Icons.Default.CalendarToday
     ) {
-        // --- TAKVİM KISMI (TAMAMEN DÜZELTİLDİ) ---
         val currentMonth = remember { YearMonth.now() }
         val startMonth = remember { currentMonth }
         val endMonth = remember { currentMonth.plusMonths(3) }
         val daysOfWeek = remember { daysOfWeek() }
-
         val calendarState = rememberCalendarState(
             startMonth = startMonth,
             endMonth = endMonth,
             firstVisibleMonth = currentMonth,
             firstDayOfWeek = daysOfWeek.first()
         )
-
         val visibleMonth = remember { derivedStateOf { calendarState.firstVisibleMonth } }.value
         Text(
             text = "${visibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.titlecase(Locale.getDefault()) }} ${visibleMonth.yearMonth.year}",
@@ -289,8 +223,6 @@ private fun DateTimeSelectionSection(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(bottom = 10.dp)
         )
-
-        // Haftanın günleri başlığı (PZT, SAL, ...)
         Row(modifier = Modifier.fillMaxWidth()) {
             daysOfWeek.forEach { dayOfWeek ->
                 Text(
@@ -302,66 +234,43 @@ private fun DateTimeSelectionSection(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-
-        // Yatay Takvim
         HorizontalCalendar(
             state = calendarState,
             dayContent = { day ->
-                CalendarDay( // Düzeltilmiş CalendarDay'i kullan
+                CalendarDay(
                     day = day,
                     isSelected = uiState.selectedDate == day.date,
                     onDayClick = { clickedDate ->
-                        if (day.position == DayPosition.MonthDate) { // Sadece ayın içindeki günlere tıkla
+                        if (day.position == DayPosition.MonthDate) {
                             onDateSelected(clickedDate)
                         }
                     }
                 )
             }
         )
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-        // --- SAAT SLOTLARI KISMI (TAMAMEN DÜZELTİLDİ) ---
         if (uiState.isLoadingSlots) {
             LoadingSection(text = stringResource(R.string.booking_screen_loading_slots))
-        } else if (uiState.availableSlots.isEmpty()) {
+        } else if (uiState.error != null && uiState.availableSlots.isEmpty()) {
             Text(
-                stringResource(id = R.string.booking_screen_no_slots),
+                stringResource(id = uiState.error),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            FlowRow( // Resmi FlowRow kullanımı
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 uiState.availableSlots.forEach { slot ->
                     val isSelected = uiState.selectedSlot == slot
-                    val chipEnabled = !uiState.isLoadingSlots
-
                     FilterChip(
                         selected = isSelected,
                         onClick = { onSlotSelected(slot) },
                         label = { Text(slot.format(DateTimeFormatter.ofPattern("HH:mm"))) },
-                        enabled = chipEnabled,
-                        leadingIcon = if (isSelected) {
-                            { Icon(Icons.Filled.Check, contentDescription = "Selected", modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                        } else null,
-                        border = BorderStroke(
-                            width = if (isSelected) 1.5.dp else 1.dp,
-                            color = when {
-                                !chipEnabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                                isSelected -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.outline
-                            }
-                        ),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
-                        )
+                        leadingIcon = if (isSelected) { { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) } } else null
                     )
                 }
             }
@@ -373,35 +282,45 @@ private fun DateTimeSelectionSection(
 private fun CustomerInfoSection(
     uiState: BookingUiState,
     onNameChanged: (String) -> Unit,
-    onPhoneChanged: (String) -> Unit
+    onPhoneChanged: (String) -> Unit,
+    onEmailChanged: (String) -> Unit
 ) {
     SectionCard(
         title = stringResource(R.string.booking_screen_section_customer_info_title),
-        icon = Icons.Default.Person // DÜZELTİLDİ: PersonOutline yerine Person
+        icon = Icons.Default.Person
     ) {
-        OutlinedTextField(
-            value = uiState.customerName,
-            onValueChange = onNameChanged,
-            label = { Text(stringResource(id = R.string.booking_screen_name_label)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = uiState.nameErrorRes != null,
-            supportingText = { uiState.nameErrorRes?.let { Text(stringResource(id = it)) } },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
-            value = uiState.customerPhone,
-            onValueChange = onPhoneChanged,
-            label = { Text(stringResource(id = R.string.booking_screen_phone_label)) },
-            placeholder = { Text("05xx xxx xx xx") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
-            isError = uiState.phoneErrorRes != null,
-            supportingText = { uiState.phoneErrorRes?.let { Text(stringResource(id = it)) } },
-            visualTransformation = PhoneNumberVisualTransformation()
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            OutlinedTextField(
+                value = uiState.customerName,
+                onValueChange = onNameChanged,
+                label = { Text(stringResource(id = R.string.booking_screen_name_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = uiState.nameError != null, // DÜZELTİLDİ: nameErrorRes yerine nameError
+                supportingText = { uiState.nameError?.let { Text(stringResource(id = it)) } },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            )
+            OutlinedTextField(
+                value = uiState.customerPhone,
+                onValueChange = onPhoneChanged,
+                label = { Text(stringResource(id = R.string.booking_screen_phone_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                isError = uiState.phoneError != null, // DÜZELTİLDİ: phoneErrorRes yerine phoneError
+                supportingText = { uiState.phoneError?.let { Text(stringResource(id = it)) } },
+                visualTransformation = PhoneNumberVisualTransformation()
+            )
+            OutlinedTextField(
+                value = uiState.customerEmail,
+                onValueChange = onEmailChanged,
+                label = { Text(stringResource(id = R.string.booking_screen_email_label)) },
+                placeholder = { Text(stringResource(id = R.string.booking_screen_email_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+            )
+        }
     }
 }
 
@@ -415,26 +334,16 @@ private fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 12.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text(text = title, style = MaterialTheme.typography.titleLarge)
             }
             content()
         }
@@ -443,38 +352,30 @@ private fun SectionCard(
 
 @Composable
 private fun LoadingSection(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = modifier.fillMaxWidth().padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        CircularProgressIndicator()
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun CalendarDay(
-    day: CalendarDay, // DÜZELTİLDİ: WeekDay yerine CalendarDay
+fun CalendarDay(
+    day: CalendarDay,
     isSelected: Boolean,
     onDayClick: (LocalDate) -> Unit
 ) {
     val isSelectable = day.position == DayPosition.MonthDate && day.date >= LocalDate.now()
-
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .padding(4.dp)
             .clip(CircleShape)
             .background(color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .clickable(
-                enabled = isSelectable,
-                onClick = { onDayClick(day.date) }
-            ),
+            .clickable(enabled = isSelectable) { onDayClick(day.date) },
         contentAlignment = Alignment.Center
     ) {
         val textColor = when {
