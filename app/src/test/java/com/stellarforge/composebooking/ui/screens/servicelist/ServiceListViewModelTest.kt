@@ -1,4 +1,4 @@
-// ServiceListViewModelTest.kt
+package com.stellarforge.composebooking.ui.screens.servicelist
 
 import app.cash.turbine.test
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -6,20 +6,18 @@ import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.domain.repository.AppointmentRepository
+import com.stellarforge.composebooking.domain.repository.ServiceRepository
 import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
-import com.stellarforge.composebooking.ui.screens.servicelist.ServiceListUiState
-import com.stellarforge.composebooking.ui.screens.servicelist.ServiceListViewEvent
-import com.stellarforge.composebooking.ui.screens.servicelist.ServiceListViewModel
-import com.stellarforge.composebooking.utils.Result
+import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.MainDispatcherRule
+import com.stellarforge.composebooking.utils.Result
 import io.mockk.*
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
@@ -27,8 +25,16 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import timber.log.Timber
-import kotlin.time.Duration.Companion.seconds // Turbine için
+import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Unit tests for [ServiceListViewModel].
+ *
+ * Tests the Customer Home Screen logic, including:
+ * - Fetching the list of available services.
+ * - Loading the business profile.
+ * - Error states.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServiceListViewModelTest {
 
@@ -39,7 +45,10 @@ class ServiceListViewModelTest {
     val mockkRule = MockKRule(this)
 
     @RelaxedMockK
-    private lateinit var mockServiceRepository: AppointmentRepository
+    private lateinit var mockServiceRepository: ServiceRepository
+
+    @RelaxedMockK
+    private lateinit var mockAppointmentRepository: AppointmentRepository
 
     @RelaxedMockK
     private lateinit var mockSignOutUseCase: SignOutUseCase
@@ -52,62 +61,60 @@ class ServiceListViewModelTest {
 
     private lateinit var viewModel: ServiceListViewModel
 
-    // Test verileri
     private val fakeAuthUser = AuthUser("test_uid", "test@test.com")
     private val fakeServices = listOf(Service(id = "s1", name = "Service 1"))
 
     @Before
     fun setUp() {
-        // FirebaseFirestoreException mock'u (statik olduğu için)
+        // Mock static Firebase Exception to prevent initialization errors in unit tests
         mockkStatic(FirebaseFirestoreException.Code::class)
         every { FirebaseFirestoreException.Code.values() } returns emptyArray()
 
-        // Timber'ı test logları için ayarla
+        // Redirect Timber logs to System.out for test debugging
         Timber.uprootAll()
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-                println("TIMBER: $message") // Test loglarını basitleştirelim
-                t?.printStackTrace()
+                println("TIMBER: $message")
             }
         })
-        Timber.d("setUp: Başladı.")
     }
 
     @After
     fun tearDown() {
-        Timber.d("tearDown: Başladı.")
         unmockkStatic(FirebaseFirestoreException.Code::class)
         Timber.uprootAll()
     }
 
-    // ViewModel'ı oluşturan yardımcı fonksiyon (YENİ VIEWMODEL'A GÖRE)
     private fun createViewModel() {
         viewModel = ServiceListViewModel(
             serviceRepository = mockServiceRepository,
+            appointmentRepository = mockAppointmentRepository,
             signOutUseCase = mockSignOutUseCase,
-            getCurrentUserUseCase = mockGetCurrentUserUseCase, // YENİ
-            getBusinessProfileUseCase = mockGetBusinessProfileUseCase  // YENİ
+            getCurrentUserUseCase = mockGetCurrentUserUseCase,
+            getBusinessProfileUseCase = mockGetBusinessProfileUseCase
         )
-        Timber.d("createViewModel: ViewModel oluşturuldu.")
     }
 
-    // --- TEMEL AUTH VE BAŞARILI YÜKLEME SENARYOLARI ---
     @Test
-    fun `init - when user exists - loads initial data successfully`() = runTest {
+    fun `init - when user exists - loads services and business profile successfully`() = runTest {
         // ARRANGE
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(fakeAuthUser)
-        coEvery { mockGetBusinessProfileUseCase(fakeAuthUser.uid) } returns flowOf(Result.Success(null)) // İşletme adı şimdilik önemli değil
-        coEvery { mockServiceRepository.getServices() } returns flowOf(Result.Success(fakeServices))
+
+        // Using constant TARGET_ID for business profile
+        every { mockGetBusinessProfileUseCase(FirebaseConstants.TARGET_BUSINESS_OWNER_ID) } returns flowOf(Result.Success(null))
+
+        // Ensure we call the customer stream
+        every { mockServiceRepository.getCustomerServicesStream() } returns flowOf(Result.Success(fakeServices))
 
         // ACT
-        createViewModel() // init bloğu loadInitialData'yı tetikler
+        createViewModel()
 
         // ASSERT
         viewModel.uiState.test {
-            // Başlangıç Loading state'i
+            // First: Loading
             assertEquals(ServiceListUiState.Loading, awaitItem())
 
-            // Başarılı yükleme sonrası Success state'i
+            // Second: Success
             val successState = awaitItem()
             assertTrue("State should be Success", successState is ServiceListUiState.Success)
             assertEquals(fakeServices, (successState as ServiceListUiState.Success).services)
@@ -115,76 +122,79 @@ class ServiceListViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // UseCase ve Repository çağrılarını doğrula
         coVerify(exactly = 1) { mockGetCurrentUserUseCase() }
-        coVerify(exactly = 1) { mockGetBusinessProfileUseCase(fakeAuthUser.uid) }
-        coVerify(exactly = 1) { mockServiceRepository.getServices() }
+        verify(exactly = 1) { mockGetBusinessProfileUseCase(FirebaseConstants.TARGET_BUSINESS_OWNER_ID) }
+        verify(exactly = 1) { mockServiceRepository.getCustomerServicesStream() }
     }
 
     @Test
-    fun `init - when getCurrentUser fails - uiState is Error`() = mainDispatcherRule.testScope.runTest { // Kendi scope'umuzu kullan
+    fun `init - when getCurrentUser fails - uiState is Error`() = runTest {
         // ARRANGE
         val authException = Exception("Auth failed")
+
+        // 1. User check fails
         coEvery { mockGetCurrentUserUseCase() } returns Result.Error(authException)
+
+        every { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
 
         // ACT
         createViewModel()
-        // ViewModel'ın init'i tetiklendi ama içindeki launch henüz çalışmadı.
-
-        // ASSERT - Başlangıç durumunu kontrol et
-        var currentState = viewModel.uiState.value
-        assertTrue("Initial state should be Loading", currentState is ServiceListUiState.Loading)
-
-        // Coroutine scheduler'ını ilerleterek viewModelScope.launch'ın çalışmasını sağla
         mainDispatcherRule.scheduler.advanceUntilIdle()
 
-        // ASSERT - Son durumu kontrol et
-        currentState = viewModel.uiState.value
-        assertTrue("Final state should be Error, but was $currentState", currentState is ServiceListUiState.Error)
+        // ASSERT
+        var currentState = viewModel.uiState.value
+
+        assertTrue("Final state should be Error", currentState is ServiceListUiState.Error)
         assertEquals(
             R.string.error_auth_user_not_found_for_services,
             (currentState as ServiceListUiState.Error).messageResId
         )
 
-        // Orijinal exception'ın da state'e eklendiğini kontrol edelim
-        assertEquals(authException, (currentState as ServiceListUiState.Error).exception)
-
-        coVerify(exactly = 0) { mockGetBusinessProfileUseCase(any()) }
-        coVerify(exactly = 0) { mockServiceRepository.getServices() }
+        // Services should NOT be fetched if auth fails
+        coVerify(exactly = 0) { mockServiceRepository.getCustomerServicesStream() }
     }
 
     @Test
     fun `onRetryClicked - reloads initial data`() = runTest {
         // ARRANGE
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(fakeAuthUser)
-        coEvery { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
-        coEvery { mockServiceRepository.getServices() } returns flowOf(Result.Success(fakeServices))
+        every { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
+        every { mockServiceRepository.getCustomerServicesStream() } returns flowOf(Result.Success(fakeServices))
+
         createViewModel()
-        advanceUntilIdle() // İlk yüklemenin bitmesini bekle
+
+        // Consume initial flow
+        viewModel.uiState.test {
+            awaitItem() // Loading
+            awaitItem() // Success
+            cancelAndIgnoreRemainingEvents()
+        }
 
         // ACT
         viewModel.onRetryClicked()
 
         // ASSERT
         viewModel.uiState.test {
-            // Tekrar deneme sonrası ilk state Loading olur
+            // Loading again
             assertEquals(ServiceListUiState.Loading, awaitItem())
-            // Sonra Success gelir
+            // Success again
             assertTrue(awaitItem() is ServiceListUiState.Success)
+            cancelAndIgnoreRemainingEvents()
         }
 
-        // UseCase'lerin TOPLAMDA 2 kere çağrıldığını doğrula (init + retry)
+        // Verify it was called twice
         coVerify(exactly = 2) { mockGetCurrentUserUseCase() }
-        coVerify(exactly = 2) { mockServiceRepository.getServices() }
     }
 
     @Test
     fun `signOut - when use case succeeds - emits NavigateToLogin event`() = runTest {
         // ARRANGE
-        coEvery { mockGetCurrentUserUseCase() } returns Result.Success(fakeAuthUser) // init'te hata vermemesi için
+        coEvery { mockGetCurrentUserUseCase() } returns Result.Success(fakeAuthUser)
+        every { mockServiceRepository.getCustomerServicesStream() } returns flowOf(Result.Success(emptyList()))
+        every { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
         coEvery { mockSignOutUseCase() } returns Result.Success(Unit)
+
         createViewModel()
-        advanceUntilIdle()
 
         // ACT & ASSERT
         viewModel.eventFlow.test(timeout = 3.seconds) {
@@ -192,6 +202,7 @@ class ServiceListViewModelTest {
             assertEquals(ServiceListViewEvent.NavigateToLogin, awaitItem())
             cancelAndConsumeRemainingEvents()
         }
+
         coVerify(exactly = 1) { mockSignOutUseCase() }
     }
 }

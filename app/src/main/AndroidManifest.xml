@@ -2,8 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      REQUIRED PERMISSIONS
+      - Internet: Necessary for Firebase Authentication and Firestore Database operations.
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+      APPLICATION CONFIGURATION
+      - android:name: Points to the Hilt Application class (.StellarForgeBookingApp).
+      - android:icon / roundIcon: The app launcher icons (Replace via Image Asset Studio).
+      - android:label: The App Name shown on the device (Change in strings.xml).
+      - android:theme: Sets the initial Splash Screen theme to avoid "White Screen" on startup.
+    -->
     <application
         android:name=".StellarForgeBookingApp"
         android:allowBackup="true"
@@ -13,19 +24,25 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ComposeBooking"
+        android:theme="@style/Theme.App.Starting"
         tools:targetApi="31">
+
+        <!--
+          MAIN ACTIVITY (Single Activity Architecture)
+          This is the sole entry point of the application.
+          All screens (Login, Home, Profile) are handled via Jetpack Navigation within this Activity.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.ComposeBooking">
+            android:label="@string/app_name">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>

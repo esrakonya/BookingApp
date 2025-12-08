@@ -6,18 +6,24 @@ import com.stellarforge.composebooking.utils.Result
 import javax.inject.Inject
 
 /**
- * Mevcut giriş yapmış kullanıcıyı almak için kullanılan Use Case.
- * SRP: Sadece mevcut kullanıcıyı alma iş mantığını içerir (bu durumda repository'ye delegasyon).
+ * UseCase responsible for retrieving the currently authenticated user session.
+ *
+ * **Architectural Role:**
+ * Although this currently acts as a simple pass-through to the [AuthRepository],
+ * keeping this layer is crucial for Clean Architecture. It allows for future expansion
+ * (e.g., refreshing tokens, checking user bans, or fetching additional metadata)
+ * without modifying the UI code.
  */
 class GetCurrentUserUseCase @Inject constructor(
     private val authRepository: AuthRepository
 ) {
     /**
-     * Use case'i fonksiyon gibi çağırmak için.
-     * @return Giriş yapmış kullanıcı varsa AuthUser, yoksa null içeren Result.
+     * Executes the retrieval logic.
+     *
+     * @return A [Result] containing the [AuthUser] object if logged in,
+     *         or [Result.Success] with `null` if the user is not authenticated (Guest).
      */
     suspend operator fun invoke(): Result<AuthUser?> {
-        // İleride burada ek iş mantığı (örn. kullanıcı rolü kontrolü) eklenebilir.
         return authRepository.getCurrentUser()
     }
 }

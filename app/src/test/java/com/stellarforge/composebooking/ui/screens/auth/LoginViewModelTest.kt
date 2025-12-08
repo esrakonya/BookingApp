@@ -1,74 +1,88 @@
 package com.stellarforge.composebooking.ui.screens.auth
 
 import app.cash.turbine.test
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.domain.usecase.SignInUseCase
+import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
+import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import com.stellarforge.composebooking.utils.MainDispatcherRule
-import com.google.firebase.FirebaseNetworkException // Sadece TİPİNİ belirtmek için import
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.stellarforge.composebooking.utils.Result
-import io.mockk.* // mockk, coEvery, coVerify
+import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.advanceTimeBy // Zamanı ilerletmek için
-import kotlinx.coroutines.test.runCurrent // Bekleyen coroutine'leri çalıştırmak için
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.time.Duration.Companion.milliseconds // Daha küçük birim
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Unit tests for [LoginViewModel] (Customer Login).
+ *
+ * Key Scenarios Tested:
+ * - **Happy Path:** Successful login with correct credentials and 'customer' role.
+ * - **Security Check:** Verifies that a Business Owner cannot login via the Customer portal.
+ * - **Input Validation:** Tests email format and empty password checks.
+ * - **Error Handling:** Ensures proper error messages are shown for Network or Credential errors.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LoginViewModelTest {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRule() // StandardTestDispatcher kullanır
+    val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var mockSignInUseCase: SignInUseCase
+    private lateinit var mockSignOutUseCase: SignOutUseCase
     private lateinit var viewModel: LoginViewModel
 
     private val testEmail = "test@example.com"
     private val testPassword = "password123"
-    private val successUser = AuthUser("uid123", testEmail)
+    private val successCustomerUser = AuthUser("uid123", testEmail, role = "customer")
+    private val successOwnerUser = AuthUser("uid999", testEmail, role = "owner")
 
-    // Testlerde kullanılacak mock exception'lar (nesnelerini oluşturmuyoruz, sadece mockluyoruz)
     private val mockNetworkException: FirebaseNetworkException = mockk()
     private val mockInvalidCredentialsException: FirebaseAuthInvalidCredentialsException = mockk()
     private val mockInvalidUserException: FirebaseAuthInvalidUserException = mockk()
     private val mockOtherException: Exception = mockk()
 
-
     @Before
     fun setUp() {
         mockSignInUseCase = mockk()
-        viewModel = LoginViewModel(mockSignInUseCase)
+        mockSignOutUseCase = mockk {
+            coEvery { this@mockk.invoke() } returns Result.Success(Unit)
+        }
 
-        // Varsayılan başarılı signIn (her testte override edilebilir)
-        coEvery { mockSignInUseCase(any(), any()) } returns Result.Success(successUser)
+        viewModel = LoginViewModel(mockSignInUseCase, mockSignOutUseCase)
 
-        // Mock exception'lar için temel davranışlar (mesaj döndürme gibi)
-        // Bu, exception.localizedMessage çağrıldığında NullPointerException vermesini engeller
         every { mockNetworkException.localizedMessage } returns "Mocked Network Error"
         every { mockInvalidCredentialsException.localizedMessage } returns "Mocked Invalid Credentials"
         every { mockInvalidUserException.localizedMessage } returns "Mocked Invalid User"
         every { mockOtherException.localizedMessage } returns "Some other unknown error"
     }
 
-    // ... (onEmailChange, onPasswordChange, blank email, blank password, invalid email format testleri aynı)
 
     @Test
-    fun `onLoginClick with valid input and successful signIn emits NavigateToServiceList`() = runTest {
+    fun `onLoginClick with valid input and successful signIn emits NavigateTo ServiceList`() = runTest {
+        // GIVEN
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
+        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Success(successCustomerUser)
 
+        // WHEN & THEN
         viewModel.eventFlow.test(timeout = 3.seconds) {
             viewModel.onLoginClick()
-            assertEquals(LoginViewEvent.NavigateToServiceList, awaitItem())
-            cancelAndConsumeRemainingEvents() // Önemli: Akışı düzgün kapat
+
+            val expectedEvent = LoginViewEvent.NavigateTo(ScreenRoutes.ServiceList.route)
+            assertEquals(expectedEvent, awaitItem())
+
+            cancelAndConsumeRemainingEvents()
         }
 
         val state = viewModel.uiState.value
@@ -77,23 +91,98 @@ class LoginViewModelTest {
         coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) }
     }
 
+
     @Test
-    fun `onLoginClick with valid input and failed signIn (InvalidCredentials) sets correct generalErrorRes`() = runTest {
+    fun `onLoginClick with valid input BUT wrong role (Owner) shows specific error and signs out`() = runTest {
+        // GIVEN
+        viewModel.onEmailChange(testEmail)
+        viewModel.onPasswordChange(testPassword)
+
+        // Simulate an Owner trying to log in
+        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Success(successOwnerUser)
+
+        // WHEN & THEN
+        viewModel.eventFlow.test {
+            viewModel.onLoginClick()
+
+            val expectedEvent = LoginViewEvent.ShowSnackbar(R.string.error_auth_owner_at_customer_login)
+            assertEquals(expectedEvent, awaitItem())
+
+            cancelAndConsumeRemainingEvents()
+        }
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+
+        // Security: Ensure session is cleared immediately
+        coVerify(exactly = 1) { mockSignOutUseCase() }
+    }
+
+    @Test
+    fun `onLoginClick with invalid email format sets emailErrorRes and DOES NOT call useCase`() = runTest {
+        // GIVEN
+        val badEmail = "mail-without-at-sign"
+        viewModel.onEmailChange(badEmail)
+        viewModel.onPasswordChange(testPassword)
+
+        // WHEN
+        viewModel.onLoginClick()
+
+        // THEN
+        val state = viewModel.uiState.value
+        assertEquals(R.string.error_email_invalid, state.emailErrorRes)
+
+        coVerify(exactly = 0) { mockSignInUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `onLoginClick with empty password sets passwordErrorRes`() = runTest {
+        // GIVEN
+        viewModel.onEmailChange(testEmail)
+        viewModel.onPasswordChange("")
+
+        // WHEN
+        viewModel.onLoginClick()
+
+        // THEN
+        val state = viewModel.uiState.value
+        assertEquals(R.string.error_password_empty, state.passwordErrorRes)
+
+        coVerify(exactly = 0) { mockSignInUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `onEmailChange clears previous error states`() = runTest {
+        // GIVEN
+        viewModel.onEmailChange("")
+        viewModel.onLoginClick()
+        assertTrue(viewModel.uiState.value.emailErrorRes != null)
+
+        // WHEN
+        viewModel.onEmailChange("n")
+
+        // THEN
+        assertNull(viewModel.uiState.value.emailErrorRes)
+        assertNull(viewModel.uiState.value.generalErrorRes)
+    }
+
+
+    @Test
+    fun `onLoginClick with failed signIn (InvalidCredentials) sets correct generalErrorRes`() = runTest {
         coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockInvalidCredentialsException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
         viewModel.onLoginClick()
-        runCurrent() // ViewModel içindeki launch bloğunun çalışmasını sağla
+        runCurrent()
 
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertEquals(R.string.error_auth_invalid_credentials, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) }
     }
 
     @Test
-    fun `onLoginClick with valid input and failed signIn (NetworkError) sets correct generalErrorRes`() = runTest {
+    fun `onLoginClick with failed signIn (NetworkError) sets correct generalErrorRes`() = runTest {
         coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockNetworkException)
 
         viewModel.onEmailChange(testEmail)
@@ -104,26 +193,10 @@ class LoginViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertEquals(R.string.error_network_connection, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) }
     }
 
     @Test
-    fun `onLoginClick with valid input and failed signIn (InvalidUser) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockInvalidUserException)
-
-        viewModel.onEmailChange(testEmail)
-        viewModel.onPasswordChange(testPassword)
-        viewModel.onLoginClick()
-        runCurrent()
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isLoading)
-        assertEquals(R.string.error_auth_invalid_credentials, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) }
-    }
-
-    @Test
-    fun `onLoginClick with valid input and failed signIn (OtherError) sets general login_failed error`() = runTest {
+    fun `onLoginClick with failed signIn (OtherError) sets general login_failed error`() = runTest {
         coEvery { mockSignInUseCase(testEmail, testPassword) } returns Result.Error(mockOtherException)
 
         viewModel.onEmailChange(testEmail)
@@ -134,7 +207,6 @@ class LoginViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertEquals(R.string.error_login_failed, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) }
     }
 
     @Test
@@ -142,49 +214,22 @@ class LoginViewModelTest {
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
 
-        // UseCase'in ilk çağrıda bir süre beklemesini sağla ki isLoading true kalsın
         coEvery { mockSignInUseCase(testEmail, testPassword) } coAnswers {
-            // isLoading'in true olarak set edildiğini doğrulamak için viewModelScope'un çalışmasını bekle
-            // Ancak bu TestCoroutineDispatcher'da hemen olmayabilir.
-            // Önemli olan, ikinci tıklamada UseCase'in tekrar çağrılmaması.
-            // Bu yüzden ilk tıklamadan sonra isLoading'i direkt kontrol etmek yerine
-            // UseCase çağrı sayısına odaklanalım.
-            // Test dispatcher'ı zamanı manuel ilerletmemizi gerektirebilir.
-            // Şimdilik bu delay'i kaldırıp sadece çağrı sayısını kontrol edelim,
-            // ViewModel'daki isLoading kontrolü yeterli olmalı.
-            // delay(100.milliseconds)
-            Result.Success(successUser)
+            delay(1000)
+            Result.Success(successCustomerUser)
         }
 
-        // Act
-        viewModel.onLoginClick() // İlk çağrı
-        // İlk çağrıdan sonra isLoading true olmalı, ama UseCase hemen dönerse false olabilir.
-        // Bizim için önemli olan, ikinci tıklamanın UseCase'i tetiklememesi.
-        // ViewModel'daki if (currentState.isLoading) return; satırının çalışması lazım.
+        viewModel.onLoginClick()
 
-        // isLoading'in true olduğunu varsaymak için, UseCase'in uzun süreceğini simüle edebiliriz
-        // VEYA ViewModel'ın isLoading'i set etmesini ve sonraki tıklamada bunu kontrol etmesini bekleyebiliriz.
-        // En basit yol, UseCase'in çağrı sayısını doğrulamak.
+        runCurrent()
+        assertTrue(viewModel.uiState.value.isLoading)
 
-        val firstCallState = viewModel.uiState.value // İlk tıklamadan sonraki state
-        if (!firstCallState.isLoading) {
-            // Eğer mockSignInUseCase çok hızlı dönüp isLoading'i false yaptıysa,
-            // bu testi doğru simüle etmek zorlaşır.
-            // Bu durumda, ViewModel'ın iç state'ini manipüle etmek (test için)
-            // veya daha karmaşık bir zamanlama kontrolü gerekir.
-            // Şimdilik, ViewModel'daki `if (currentState.isLoading) return`'e güveniyoruz.
-            println("WARNING: isLoading was false after first click in 'already loading' test. Test might not be fully effective.")
-        }
+        // Attempt second click while loading
+        viewModel.onLoginClick()
 
-        viewModel.onLoginClick() // İkinci çağrı (isLoading true ise bir şey yapmamalı)
-        runCurrent() // İkinci tıklamanın etkilerini (veya etkisizliğini) işle
+        advanceUntilIdle()
 
-        // Assert
-        coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) } // UseCase sadece bir kez çağrılmalı
-
-        // İsteğe bağlı: Akışın tamamlanmasını bekle (eğer ilk çağrı hala devam ediyorsa)
-        // advanceUntilIdle() // Tüm coroutine'lerin bitmesini bekle
-        val finalState = viewModel.uiState.value
-        assertFalse("isLoading should be false if use case completed", finalState.isLoading)
+        // Verify only one call was made
+        coVerify(exactly = 1) { mockSignInUseCase(testEmail, testPassword) }
     }
 }

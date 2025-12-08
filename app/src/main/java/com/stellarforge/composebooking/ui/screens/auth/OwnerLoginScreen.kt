@@ -1,40 +1,34 @@
 package com.stellarforge.composebooking.ui.screens.auth
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.Email // E-posta ikonu
-import androidx.compose.material.icons.filled.Lock // Kilit ikonu
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.focusModifier
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource // Logo için
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.stellarforge.composebooking.R // R.drawable.your_app_logo için varsayımsal import
+import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
+/**
+ * The dedicated Login screen for **Business Owners**.
+ *
+ * **Architecture Note:**
+ * This screen reuses the [LoginScreenTemplate] to ensure design consistency with the
+ * Customer Login screen, but injects Owner-specific logic and navigation paths.
+ *
+ * **Flow:**
+ * - On Success: Navigates to the [ScreenRoutes.Schedule] (Admin Dashboard).
+ * - On Failure: Shows an error via [AppSnackbarHost].
+ * - Security: If a Customer tries to log in here, the [OwnerLoginViewModel] blocks access.
+ */
 @Composable
 fun OwnerLoginScreen(
     navController: NavController,
@@ -42,45 +36,58 @@ fun OwnerLoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    // Handle One-time Events (Navigation & Errors)
     LaunchedEffect(key1 = true) {
         viewModel.eventFlow.collectLatest { event ->
             when (event) {
                 is LoginViewEvent.NavigateTo -> {
                     navController.navigate(event.route) {
+                        // Clear back stack to prevent returning to Login
                         popUpTo(ScreenRoutes.Login.route) { inclusive = true }
                         launchSingleTop = true
                     }
                 }
 
                 is LoginViewEvent.ShowSnackbar -> {
-                    val message = context.getString(event.messageId) // formatArgs yoktu event'te
-                    snackbarHostState.showSnackbar(
-                        message = message,
-                        duration = SnackbarDuration.Short
-                    )
+                    scope.launch {
+                        // Trigger the Red/Error style in AppSnackbar by setting actionLabel to "error"
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(event.messageId),
+                            actionLabel = "error",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
                 }
             }
         }
     }
 
-    LoginScreenContent(
+    // Render UI using the shared Template
+    LoginScreenTemplate(
         uiState = uiState,
-        screenTitle = stringResource(R.string.owner_login_title),
         onEmailChange = viewModel::onEmailChange,
         onPasswordChange = viewModel::onPasswordChange,
         onLoginClick = viewModel::onLoginClick,
-        onNavigateBack = { navController.popBackStack() },
         snackbarHostState = snackbarHostState,
-        linksContent = {
-            TextButton(onClick = { navController.navigate(ScreenRoutes.OwnerSignUp.route) }) {
-                Text("İşletme Hesabı Oluştur")
-            }
-            Divider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 32.dp))
-            TextButton(onClick = { navController.popBackStack() }) { // Geri dön
-                Text("Müşteri misiniz? Geri Dön")
-            }
-        }
+
+        // --- Owner Specific Header ---
+        title = stringResource(R.string.owner_login_title), // "Business Login"
+        subtitle = stringResource(R.string.owner_login_subtitle), // "Manage your business efficiently."
+
+        // --- Footer Actions ---
+
+        // Primary: Navigate to Owner Registration
+        primaryFooterText = stringResource(R.string.signup_owner_link), // "Create Business Account"
+        onPrimaryFooterClick = { navController.navigate(ScreenRoutes.OwnerSignUp.route) },
+
+        // Secondary: Return to Customer Login (Role Switch)
+        secondaryFooterText = stringResource(R.string.login_back_to_customer), // "Back to Customer Login"
+        onSecondaryFooterClick = { navController.popBackStack() },
+
+        // Back button enabled to easily return to main entrance
+        onNavigateBack = { navController.popBackStack() }
     )
 }

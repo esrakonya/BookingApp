@@ -1,43 +1,12 @@
 package com.stellarforge.composebooking.ui.screens.mybookings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -51,14 +20,22 @@ import com.google.firebase.Timestamp
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
+import com.stellarforge.composebooking.ui.components.AppSnackbarHost
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.utils.toFormattedPrice
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+/**
+ * Screen for Customers to view their Upcoming and Past appointments.
+ *
+ * **Features:**
+ * - **Tabs:** Splits bookings into 'Upcoming' and 'Past' categories.
+ * - **Cancellation:** Allows cancelling future appointments.
+ * - **Real-time Updates:** Automatically refreshes when data changes.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyBookingsScreen(
@@ -68,18 +45,27 @@ fun MyBookingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf(
         stringResource(id = R.string.my_bookings_tab_upcoming),
         stringResource(id = R.string.my_bookings_tab_past)
     )
 
+    // Handle Events
     LaunchedEffect(key1 = viewModel.eventFlow) {
         viewModel.eventFlow.collectLatest { event ->
             when (event) {
                 is MyBookingsEvent.ShowSnackbar -> {
-                    launch {
-                        snackbarHostState.showSnackbar(context.getString(event.messageId))
+                    scope.launch {
+                        // Assuming most snackbars here are success messages (cancellation success)
+                        // If you have error messages too, you might want to pass 'type' in event
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(event.messageId),
+                            actionLabel = "success", // Green for success
+                            duration = SnackbarDuration.Short
+                        )
                     }
                 }
             }
@@ -97,7 +83,9 @@ fun MyBookingsScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        // CUSTOM SNACKBAR HOST
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+
         bottomBar = {
             AppBottomNavigationBar(navController = navController, userRole = "customer")
         }
@@ -132,8 +120,11 @@ fun MyBookingsScreen(
                         )
                     }
                 }
-                uiState.error != null -> {
-                    ErrorState(message = uiState.error!!, onRetry = { viewModel.loadMyBookings() })
+                uiState.errorResId != null -> {
+                    ErrorState(
+                        message = stringResource(id = uiState.errorResId!!),
+                        onRetry = { viewModel.loadMyBookings() }
+                    )
                 }
             }
         }
@@ -243,13 +234,14 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
     }
 }
 
-// --- YARDIMCI FORMATLAMA FONKSİYONLARI ---
+// --- HELPER FORMATTING FUNCTIONS ---
 private fun Timestamp.toFormattedDate(): String {
-    val sdf = SimpleDateFormat("dd MMMM yyyy, EEEE", Locale("tr", "TR"))
+    // Use device default locale for date format
+    val sdf = SimpleDateFormat("dd MMMM yyyy, EEEE", Locale.getDefault())
     return sdf.format(this.toDate())
 }
 
 private fun Timestamp.toFormattedTime(): String {
-    val sdf = SimpleDateFormat("HH:mm", Locale("tr", "TR"))
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(this.toDate())
 }

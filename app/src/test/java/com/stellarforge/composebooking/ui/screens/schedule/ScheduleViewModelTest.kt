@@ -5,9 +5,9 @@ import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.domain.usecase.GetScheduleForDateUseCase
-import com.stellarforge.composebooking.ui.screens.mybookings.MyBookingsViewModel
 import com.stellarforge.composebooking.utils.MainDispatcherRule
 import com.stellarforge.composebooking.utils.Result
+import com.stellarforge.composebooking.R
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.impl.annotations.RelaxedMockK
@@ -59,7 +59,7 @@ class ScheduleViewModelTest {
         assertThat(state.isLoading).isFalse()
         assertThat(state.selectedDate).isEqualTo(today)
         assertThat(state.appointments).isEqualTo(todaysAppointments)
-        assertThat(state.error).isNull()
+        assertThat(state.errorResId).isNull()
 
         coVerify(exactly = 1) { getCurrentUserUseCase() }
         coVerify(exactly = 1) { getScheduleForDateUseCase(testUser.uid, today) }
@@ -68,15 +68,17 @@ class ScheduleViewModelTest {
     @Test
     fun `init - when getCurrentUser fails - sets error state`() = runTest {
         val exception = Exception("Auth error")
-        coEvery { getCurrentUserUseCase() } returns Result.Error(exception, "Kullanıcı bilgisi alınamadı.")
+
+        // Mock failure
+        coEvery { getCurrentUserUseCase() } returns Result.Error(exception)
 
         createViewModel()
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertThat(state.isLoading).isFalse()
-        assertThat(state.error).isNotNull()
-        assertThat(state.error).isEqualTo("Kullanıcı bilgisi alınamadı.")
+        assertThat(state.errorResId).isNotNull()
+        assertThat(state.errorResId).isEqualTo(R.string.error_user_not_found_generic)
         assertThat(state.appointments).isEmpty()
 
         coVerify(exactly = 0) { getScheduleForDateUseCase(any(), any()) }
@@ -89,6 +91,7 @@ class ScheduleViewModelTest {
 
         assertThat(viewModel.uiState.value.appointments).isEqualTo(todaysAppointments)
 
+        // ACT: Change date
         viewModel.onDateSelected(tomorrow)
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
@@ -105,20 +108,25 @@ class ScheduleViewModelTest {
         createViewModel()
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
+        // ACT: Select same date
         viewModel.onDateSelected(today)
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
+        // ASSERT: Should be called only once (during init)
         coVerify(exactly = 1) { getScheduleForDateUseCase(testUser.uid, today) }
     }
 
     @Test
     fun `onRetry - when user was not loaded - re-runs initial load`() = runTest {
+        // Init fails first
         coEvery { getCurrentUserUseCase() } returns Result.Error(Exception("Auth error"))
         createViewModel()
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
+        // Fix mock
         coEvery { getCurrentUserUseCase() } returns Result.Success(testUser)
 
+        // Retry
         viewModel.onRetry()
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
@@ -129,4 +137,3 @@ class ScheduleViewModelTest {
         coVerify(exactly = 2) { getCurrentUserUseCase() }
     }
 }
-

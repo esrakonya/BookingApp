@@ -19,6 +19,11 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * Represents the UI state for the Service Management screen.
+ *
+ * @param isDeletingServiceId Holds the ID of the service currently being deleted to show a loading spinner on that specific item.
+ */
 data class ManageServiceUiState(
     val isLoading: Boolean = true,
     val services: List<Service> = emptyList(),
@@ -26,6 +31,14 @@ data class ManageServiceUiState(
     val isDeletingServiceId: String? = null
 )
 
+/**
+ * ViewModel for the "Manage Services" (Admin Dashboard) screen.
+ *
+ * **Responsibilities:**
+ * - **Data Loading:** Fetches the list of services owned by the logged-in user (Active & Inactive).
+ * - **State Management:** Handles loading states, error messages, and the list data.
+ * - **Actions:** Executes business actions like deleting a service via [DeleteServiceUseCase].
+ */
 @HiltViewModel
 class ManageServicesViewModel @Inject constructor(
     private val getOwnerServicesUseCase: GetOwnerServicesUseCase,
@@ -40,6 +53,9 @@ class ManageServicesViewModel @Inject constructor(
         loadServicesForOwner()
     }
 
+    /**
+     * Identifies the current owner and starts listening to their service stream.
+     */
     fun loadServicesForOwner() {
         _uiState.update { it.copy(isLoading = true, errorResId = null) }
 
@@ -50,31 +66,26 @@ class ManageServicesViewModel @Inject constructor(
                     if (currentUser != null && currentUser.uid.isNotBlank()) {
                         listenForOwnerServices(currentUser.uid)
                     } else {
-                        // DÜZELTME: String yerine R.string ID'si kullan
+                        Timber.w("ManageServicesViewModel: User session not found.")
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
                                 errorResId = R.string.error_user_not_found_generic
                             )
                         }
-                        Timber.w("Current user could not be determined for loading services.")
                     }
                 }
-
                 is Result.Error -> {
-                    // DÜZELTME: String yerine R.string ID'si kullan
+                    Timber.e(userResult.exception, "ManageServicesViewModel: Auth check failed.")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             errorResId = R.string.error_user_not_found_generic
                         )
                     }
-                    Timber.e(userResult.exception, "Error fetching current user.")
                 }
-
                 is Result.Loading -> {}
             }
-
         }
     }
 
@@ -82,12 +93,15 @@ class ManageServicesViewModel @Inject constructor(
         getOwnerServicesUseCase(ownerId).collectLatest { result ->
             when (result) {
                 is Result.Success -> {
-                    _uiState.update { it.copy(isLoading = false, services = result.data, errorResId = null) }
+                    _uiState.update {
+                        it.copy(isLoading = false, services = result.data, errorResId = null)
+                    }
                 }
                 is Result.Error -> {
-                    Timber.e(result.exception, "Error loading owner services.")
-                    // DÜZELTME: String yerine R.string ID'si kullan
-                    _uiState.update { it.copy(isLoading = false, errorResId = R.string.error_services_loading_failed) }
+                    Timber.e(result.exception, "Error loading owner services stream.")
+                    _uiState.update {
+                        it.copy(isLoading = false, errorResId = R.string.error_services_loading_failed)
+                    }
                 }
                 is Result.Loading -> {
                     _uiState.update { it.copy(isLoading = true) }
@@ -97,30 +111,40 @@ class ManageServicesViewModel @Inject constructor(
     }
 
     /**
-     * Kullanıcı bir servisi silmek için butona bastığında çağrılır.
-     * @param serviceId Silinecek servisin ID'si.
+     * Triggers the deletion of a specific service.
+     * Shows a loading indicator on the specific item during the process.
+     *
+     * @param serviceId The unique ID of the service to delete.
      */
     fun deleteService(serviceId: String) {
         if (serviceId.isBlank()) return
+
         viewModelScope.launch {
+            // 1. Set "Deleting" state for this specific item
             _uiState.update { it.copy(isDeletingServiceId = serviceId) }
+
             when (val result = deleteServiceUseCase(serviceId)) {
                 is Result.Success -> {
-                    Timber.i("Service with ID $serviceId marked for deletion.")
+                    Timber.i("Service deleted: $serviceId")
+                    // Success! Clear the loading state.
+                    // The list update will come automatically from the flow in listenForOwnerServices.
+                    _uiState.update { it.copy(isDeletingServiceId = null) }
                 }
                 is Result.Error -> {
-                    Timber.e(result.exception, "Failed to delete service with ID $serviceId.")
-                    // DÜZELTME: String yerine R.string ID'si kullan
-                    _uiState.update { it.copy(errorResId = R.string.error_service_deletion_failed) }
+                    Timber.e(result.exception, "Failed to delete service: $serviceId")
+                    _uiState.update {
+                        it.copy(
+                            errorResId = R.string.error_service_deletion_failed,
+                            isDeletingServiceId = null // Clear loading state on error too
+                        )
+                    }
                 }
                 is Result.Loading -> {}
             }
-            _uiState.update { it.copy(isDeletingServiceId = null) }
         }
     }
 
     fun clearError() {
         _uiState.update { it.copy(errorResId = null) }
     }
-
 }

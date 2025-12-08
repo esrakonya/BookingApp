@@ -1,91 +1,52 @@
 package com.stellarforge.composebooking.domain.repository
 
 import com.stellarforge.composebooking.data.model.Appointment
-import com.stellarforge.composebooking.data.model.Service
-import kotlinx.coroutines.flow.Flow
-import java.time.LocalDate
 import com.stellarforge.composebooking.data.model.BookedSlot
 import com.stellarforge.composebooking.utils.Result
+import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 /**
- * Randevu ve Servis verileriyle ilgili işlemleri tanımlayan arayüz.
- * Uygulamanın geri kalanı bu arayüz üzerinden veri katmanıyla etkileşim kurar.
+ * Defines the contract for managing Appointment data within the Domain layer.
+ *
+ * This repository focuses specifically on the *booking transactions* and *schedule management*.
+ * It isolates the UseCases from the underlying data sources (Firestore).
  */
 interface AppointmentRepository {
-    /**
-     * Aktif olan tüm servislerin listesini Flow olarak döndürür.
-     * Flow kullanmak, veritabanındaki değişikliklerin (eğer dinleniyorsa)
-     * otomatik olarak UI'a yansımasını sağlar.
-     * @return Servis listesini içeren bir Flow<List<Service>>.
-     */
-    fun getServices(): Flow<Result<List<Service>>>
 
     /**
-     * Belirtilen ID'ye sahip tek bir servisin detaylarını getirir.
-     * @param serviceId Getirilecek servisin ID'si.
-     * @return Servis detayını veya hatayı içeren bir Result<Service>.
-     */
-    suspend fun getServiceDetails(serviceId: String): Result<Service>
-
-    /**
-     * İŞLETME SAHİBİ için: Belirli bir işletme sahibine ait TÜM servisleri (aktif/pasif) dinler.
-     * Bu, işletme sahibinin "Servisleri Yönet" ekranı için kullanılacak.
-     * @param ownerId İşletme sahibinin UID'si.
-     */
-    fun getOwnerServicesStream(ownerId: String): Flow<Result<List<Service>>>
-
-    /**
-     * Yeni bir servis ekler.
-     * @param service Eklenecek servis verisi.
-     */
-    suspend fun addService(service: Service): Result<Unit>
-
-    /**
-     * Mevcut bir servisi günceller.
-     * @param service Güncellenmiş servis verisi.
-     */
-    suspend fun updateService(service: Service): Result<Unit>
-
-    /**
-     * Bir servisi ID'sini kullanarak siler.
-     * @param serviceId Silinecek servisin ID'si.
-     */
-    suspend fun deleteService(serviceId: String): Result<Unit>
-
-
-
-    /**
-     * Belirli bir tarihteki randevuları getirir.
-     * @param date Randevuların alınacağı tarih.
-     * @return Randevu listesini veya hatayı içeren bir Result<List<Appointment>>.
-     *         Bu fonksiyon suspend veya Flow olabilir. Suspend daha basit olabilir.
+     * Fetches a list of appointments for a specific business owner on a given date.
+     * Used primarily in the Owner's Schedule screen.
+     *
+     * @param ownerId The ID of the business owner.
+     * @param date The specific date to retrieve appointments for.
+     * @return A [Result] containing the list of appointments or an error.
      */
     suspend fun getAppointmentsForDate(ownerId: String, date: LocalDate): Result<List<Appointment>>
 
     /**
-     * Belirli bir kullanıcıya ait tüm randevuları dinler.
-     * @param userId Randevuları listelenecek müşterinin UID'si.
+     * Returns a real-time stream of appointments for a specific customer.
+     * Used in the "My Bookings" screen to show Upcoming and Past appointments.
+     *
+     * @param userId The ID of the customer.
+     * @return A [Flow] that emits updates whenever the user's booking list changes.
      */
     fun getMyBookingsStream(userId: String): Flow<Result<List<Appointment>>>
 
     /**
-     * Bir randevuyu ID'sini kullanarak siler.
-     * @param appointmentId Silinecek randevunun ID'si.
+     * Deletes an appointment record.
+     * Note: This is typically part of a larger cancellation flow that also frees up the slot.
+     *
+     * @param appointmentId The unique ID of the appointment to remove.
      */
     suspend fun deleteAppointment(appointmentId: String): Result<Unit>
 
-
-
+    /**
+     * Performs an atomic transaction to create an Appointment and reserve a Time Slot simultaneously.
+     * This ensures data integrity: an appointment cannot exist without a slot, and vice-versa.
+     *
+     * @param appointment The appointment details (User, Service, Time).
+     * @param slot The time slot reservation details (Start/End time).
+     */
     suspend fun createAppointmentAndSlot(appointment: Appointment, slot: BookedSlot): Result<Unit>
-
-
-
-
-
-
-
-
-
-
-
 }

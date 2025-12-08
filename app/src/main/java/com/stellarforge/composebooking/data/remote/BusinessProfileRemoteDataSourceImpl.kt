@@ -8,6 +8,16 @@ import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * Concrete implementation of [BusinessProfileRemoteDataSource] utilizing Cloud Firestore.
+ *
+ * This class manages the persistence of business profile data in the
+ * [FirebaseConstants.BUSINESSES_COLLECTION] collection.
+ *
+ * **Architecture Note:**
+ * It treats the `ownerUserId` as the unique Document ID. This ensures a strict
+ * 1-to-1 relationship between an Owner Account and a Business Profile.
+ */
 class BusinessProfileRemoteDataSourceImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : BusinessProfileRemoteDataSource {
@@ -17,6 +27,9 @@ class BusinessProfileRemoteDataSourceImpl @Inject constructor(
     ): Result<Unit> {
         Timber.d("DataSource: Updating business profile for ownerId: $ownerUserId")
         return try {
+            // We use .set() instead of .update().
+            // .set() creates the document if it doesn't exist, or overwrites it if it does.
+            // This is perfect for a "Save Profile" action (Upsert strategy).
             firestore.collection(FirebaseConstants.BUSINESSES_COLLECTION)
                 .document(ownerUserId)
                 .set(profile)

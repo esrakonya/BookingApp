@@ -6,25 +6,30 @@ import com.stellarforge.composebooking.utils.Result
 import javax.inject.Inject
 
 /**
- * E-posta ve şifre ile giriş yapma işlemini gerçekleştiren Use Case.
- * SRP: Sadece giriş yapma iş mantığını içerir.
+ * UseCase responsible for authenticating an existing user via Email/Password.
+ *
+ * **Single Responsibility Principle (SRP):**
+ * This class focuses solely on the "Sign In" transaction. It acts as a protective boundary
+ * between the UI (ViewModel) and the Data Layer (Repository).
  */
 class SignInUseCase @Inject constructor(
     private val authRepository: AuthRepository
 ) {
     /**
-     * Use case'i fonksiyon gibi çağırmak için.
-     * @param email Kullanıcı e-postası.
-     * @param password Kullanıcı şifresi.
-     * @return Başarılı giriş sonrası AuthUser içeren Result, veya hata.
+     * Executes the sign-in logic.
+     *
+     * @param email The user's registered email.
+     * @param password The user's password.
+     * @return [Result.Success] with [AuthUser] if credentials are valid, or [Result.Error] otherwise.
      */
     suspend operator fun invoke(email: String, password: String): Result<AuthUser> {
-        // Temel format validasyonu burada yapılabilir (opsiyonel, ViewModel'da da yapılabilir)
+        // Domain-Level Validation:
+        // Even though the UI (ViewModel) performs input validation, the Domain layer
+        // should never blindly trust external input. This "Defense in Depth" approach ensures
+        // stability regardless of who calls this UseCase.
         if (email.isBlank() || password.isBlank()) {
             return Result.Error(IllegalArgumentException("Email and password cannot be blank."))
-            // Veya daha spesifik bir exception türü / hata kodu döndürülebilir.
         }
-        // E-posta format kontrolü de eklenebilir.
 
         return authRepository.signInWithEmailPassword(email, password)
     }

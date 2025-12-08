@@ -15,9 +15,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Koyu tema için özel renk şemamız
+/**
+ * Material 3 Color Scheme for Dark Mode.
+ *
+ * Design Choice: In Dark Mode, 'Primary' is lighter to ensure contrast against dark backgrounds.
+ */
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryContainerBlue, // Karanlık temada ana renk daha açık ve soluk olabilir
+    primary = PrimaryContainerBlue, // Light Blue-Grey
     onPrimary = OnPrimaryContainerBlue,
     primaryContainer = PrimaryBlue,
     onPrimaryContainer = OnPrimaryBlue,
@@ -34,9 +38,13 @@ private val DarkColorScheme = darkColorScheme(
     outline = OutlineDark
 )
 
-// Açık tema için özel renk şemamız
+/**
+ * Material 3 Color Scheme for Light Mode.
+ *
+ * Design Choice: In Light Mode, 'Primary' is the deep brand color (Navy Blue).
+ */
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryBlue,
+    primary = PrimaryBlue, // Deep Navy
     onPrimary = OnPrimaryBlue,
     primaryContainer = PrimaryContainerBlue,
     onPrimaryContainer = OnPrimaryContainerBlue,
@@ -55,13 +63,17 @@ private val LightColorScheme = lightColorScheme(
     outline = OutlineLight
 )
 
+/**
+ * Main Theme Composable for the Application.
+ *
+ * @param darkTheme Automatically detects system dark mode setting.
+ * @param dynamicColor If true, picks colors from the user's wallpaper (Android 12+).
+ *                     Defaults to `false` to enforce the Brand Identity (White-Label requirement).
+ */
 @Composable
 fun ComposeBookingTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dinamik renk (Android 12+), duvar kağıdından renk almayı sağlar.
-    // Şablonun markalaşması için bunu 'false' yapmak, her zaman kendi renklerinizi kullanmanızı sağlar.
-    // 'true' bırakmak ise kullanıcıya daha kişisel bir deneyim sunar. Bu bir tasarım kararıdır.
-    dynamicColor: Boolean = false, // Şimdilik false yapalım ki kendi renklerimizi görelim
+    dynamicColor: Boolean = false, // Keep false to maintain consistent Brand Identity
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -69,25 +81,30 @@ fun ComposeBookingTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
 
-    // Status bar (en üstteki saat, pil ikonu olan bar) rengini temaya uygun hale getirelim.
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb() // Status bar rengini ana renge ayarla
+
+            // Set the Status Bar color to match the Primary Brand color
+            window.statusBarColor = colorScheme.primary.toArgb()
+
+            // --- STATUS BAR ICON LOGIC ---
+            // Because our Light Theme uses a DARK Primary Color (Navy Blue),
+            // we need Light Icons (isAppearanceLightStatusBars = false) in Light Mode.
+            //
+            // In Dark Theme, our Primary is Lighter, so we need Dark Icons (true).
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography, // Type.kt'den gelen tipografi ölçeği
-        // shapes = AppShapes, // Eğer özel şekillerin varsa (Shapes.kt)
+        typography = Typography, // Ensure Type.kt exists
         content = content
     )
 }

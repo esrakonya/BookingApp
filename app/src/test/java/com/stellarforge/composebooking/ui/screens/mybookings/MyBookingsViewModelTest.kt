@@ -80,7 +80,7 @@ class MyBookingsViewModelTest {
         val state = viewModel.uiState.value
         assertThat(state.isLoading).isFalse()
         assertThat(state.bookings).isEqualTo(testBookings)
-        assertThat(state.error).isNull()
+        assertThat(state.errorResId).isNull()
 
         coVerify(exactly = 1) { getCurrentUserUseCase() }
         verify(exactly = 1) { getMyBookingsUseCase(testUser.uid) }
@@ -96,7 +96,7 @@ class MyBookingsViewModelTest {
         val state = viewModel.uiState.value
         assertThat(state.isLoading).isFalse()
         assertThat(state.bookings).isNull()
-        assertThat(state.error).isEqualTo("Randevularınızı getirmek için lütfen giriş yapın.")
+        assertThat(state.errorResId).isEqualTo(R.string.error_auth_user_not_found_for_services)
 
         verify(exactly = 0) { getMyBookingsUseCase(any()) }
     }

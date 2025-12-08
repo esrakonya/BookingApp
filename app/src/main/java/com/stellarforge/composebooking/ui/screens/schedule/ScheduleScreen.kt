@@ -1,36 +1,12 @@
 package com.stellarforge.composebooking.ui.screens.schedule
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -42,20 +18,28 @@ import androidx.navigation.NavController
 import com.google.firebase.Timestamp
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
-import com.kizitonwose.calendar.core.CalendarDay
 import com.kizitonwose.calendar.core.daysOfWeek
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
+import com.stellarforge.composebooking.ui.components.AppSnackbarHost
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.ui.screens.booking.CalendarDay
-import com.stellarforge.composebooking.utils.toFormattedPrice
+import com.stellarforge.composebooking.ui.components.EmptyState
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * The main Dashboard/Schedule screen for Business Owners.
+ *
+ * **Features:**
+ * - **Interactive Calendar:** Allows the owner to navigate through days and see their agenda.
+ * - **Appointment List:** Displays detailed information (Customer Name, Service, Time) for the selected date.
+ * - **Empty State Handling:** Shows a clear message when no bookings exist for a day.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
@@ -64,38 +48,56 @@ fun ScheduleScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Note: Although we don't actively trigger snackbars in this screen yet,
+    // we keep the Host ready for future features (e.g., cancelling an appointment as Owner).
+    val snackbarHostState = remember { SnackbarHostState() }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(id = R.string.schedule_screen_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(id = R.string.action_navigate_back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(id = R.string.action_navigate_back)
+                        )
                     }
                 }
             )
         },
+        // CUSTOM SNACKBAR HOST
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+
         bottomBar = {
             AppBottomNavigationBar(navController = navController, userRole = "owner")
         }
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
+            // Calendar Header
             CalendarSection(
                 selectedDate = uiState.selectedDate,
                 onDateSelected = viewModel::onDateSelected
             )
             HorizontalDivider()
 
+            // Content Area
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     uiState.isLoading -> {
                         LoadingIndicator(modifier = Modifier.align(Alignment.Center))
                     }
-                    uiState.error != null -> {
-                        ErrorState(message = uiState.error!!, onRetry = viewModel::onRetry)
+                    uiState.errorResId != null -> {
+                        ErrorState(
+                            message = stringResource(uiState.errorResId!!),
+                            onRetry = viewModel::onRetry
+                        )
                     }
                     uiState.appointments.isEmpty() -> {
-                        EmptyState(modifier = Modifier.align(Alignment.Center))
+                        EmptyState(
+                            messageResId = R.string.schedule_screen_no_appointments,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
                     }
                     else -> {
                         AppointmentList(appointments = uiState.appointments)
@@ -193,20 +195,6 @@ private fun AppointmentListItem(appointment: Appointment) {
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = stringResource(id = R.string.schedule_screen_no_appointments),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),
@@ -221,7 +209,9 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
     }
 }
 
+// --- HELPER FORMATTING FUNCTIONS ---
 private fun Timestamp.toFormattedTime(): String {
-    val sdf = SimpleDateFormat("HH:mm", Locale("tr", "TR"))
+    // Use device default locale ensuring international support
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(this.toDate())
 }

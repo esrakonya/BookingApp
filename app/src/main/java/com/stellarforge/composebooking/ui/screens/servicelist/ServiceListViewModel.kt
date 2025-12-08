@@ -7,13 +7,14 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.stellarforge.composebooking.R
-import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.model.Service
-import com.stellarforge.composebooking.domain.repository.AppointmentRepository // VEYA ServiceRepository (projenize göre doğru olanı seçin)
+import com.stellarforge.composebooking.domain.repository.AppointmentRepository
+import com.stellarforge.composebooking.domain.repository.ServiceRepository
+import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
-import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase // YENİ
 import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
-import com.stellarforge.composebooking.utils.Result // Kendi Result.kt dosyanızın importu
+import com.stellarforge.composebooking.utils.FirebaseConstants
+import com.stellarforge.composebooking.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -22,7 +23,8 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-// ServiceListViewEvent ve ServiceListUiState sealed interface'leri aynı kalır
+// --- Events & State ---
+
 sealed interface ServiceListViewEvent {
     object NavigateToLogin : ServiceListViewEvent
     data class ShowSnackbar(@StringRes val messageResId: Int) : ServiceListViewEvent
@@ -37,20 +39,29 @@ sealed interface ServiceListUiState {
     ) : ServiceListUiState
 }
 
+/**
+ * ViewModel for the **Customer Home Screen** (Storefront).
+ *
+ * **Responsibilities:**
+ * - **Data Loading:** Fetches the list of active services (Products) available for booking.
+ * - **Branding:** Loads the Business Profile (Name) to display on the top bar.
+ * - **Auth Check:** Verifies if the user is authenticated before showing data.
+ * - **Session Management:** Handles the Sign-Out process.
+ */
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
-class ServiceListViewModel @OptIn(ExperimentalCoroutinesApi::class)
-@Inject constructor(
-    private val serviceRepository: AppointmentRepository,
+class ServiceListViewModel @Inject constructor(
+    private val appointmentRepository: AppointmentRepository, // Kept for future booking features
+    private val serviceRepository: ServiceRepository,
     private val signOutUseCase: SignOutUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
-    private val getBusinessProfileUseCase: GetBusinessProfileUseCase // YENİ ENJEKSİYON
+    private val getBusinessProfileUseCase: GetBusinessProfileUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ServiceListUiState>(ServiceListUiState.Loading)
     val uiState: StateFlow<ServiceListUiState> = _uiState.asStateFlow()
 
-    // YENİ: İşletme adını tutmak için StateFlow
+    // Holds the Business Name to be displayed in the TopBar
     private val _businessName = MutableStateFlow<String?>(null)
     val businessName: StateFlow<String?> = _businessName.asStateFlow()
 
@@ -59,116 +70,94 @@ class ServiceListViewModel @OptIn(ExperimentalCoroutinesApi::class)
 
     init {
         Timber.d("ServiceListViewModel initialized.")
-        loadInitialData() // Hem servisleri hem de işletme profilini yükle
+        loadInitialData()
     }
 
-    // `loadServices` yerine daha genel bir isim
+    /**
+     * Orchestrates the initial data loading process.
+     * 1. Starts loading the Business Profile (Independent of user auth).
+     * 2. Checks User Auth status.
+     * 3. If authenticated, loads the Service Catalog.
+     */
     fun loadInitialData() {
         _uiState.value = ServiceListUiState.Loading
-        _businessName.value = null // Başlangıçta işletme adını sıfırla
-        Timber.d("ServiceListViewModel: Attempting to load initial data...")
+        _businessName.value = null
+        Timber.d("ServiceListViewModel: Loading initial data...")
 
         viewModelScope.launch {
-            // Önce mevcut kullanıcıyı al
-            when (val userResult = getCurrentUserUseCase()) { // userResult tipi: com.stellarforge.composebooking.utils.Result<AuthUser?>
+            // Task A: Load Shop Name (Always visible)
+            launch {
+                loadBusinessProfile(FirebaseConstants.TARGET_BUSINESS_OWNER_ID)
+            }
+
+            // Task B: Check User & Load Services
+            when (val userResult = getCurrentUserUseCase()) {
                 is Result.Success -> {
                     val authUser = userResult.data
                     if (authUser != null && authUser.uid.isNotBlank()) {
-                        Timber.d("ServiceListViewModel: User authenticated (UID: ${authUser.uid}).")
-                        // İşletme adını yükle (paralel olarak başlatılabilir)
-                        launch { loadBusinessNameForCurrentUser(authUser.uid) }
-                        // Servisleri yükle
-                        loadServicesForCurrentUser(authUser)
+                        Timber.d("User authenticated: ${authUser.uid}")
+                        loadServices()
                     } else {
-                        handleUserAuthError("User is null or UID blank after GetCurrentUserUseCase success.")
+                        handleUserAuthError("User session is invalid.")
                     }
                 }
                 is Result.Error -> {
-                    handleUserAuthError("GetCurrentUserUseCase failed.", userResult.exception)
+                    handleUserAuthError("Auth check failed.", userResult.exception)
                 }
-                is Result.Loading -> {
-                    Timber.d("ServiceListViewModel: GetCurrentUserUseCase is Loading. UI state already Loading.")
-                    // _uiState.value zaten Loading olduğu için ek bir işlem yapmaya gerek yok.
-                }
+                is Result.Loading -> { }
             }
         }
     }
 
-    private suspend fun loadBusinessNameForCurrentUser(ownerUserId: String) {
-        Timber.d("ServiceListViewModel: Loading business name for ownerUserId: $ownerUserId")
-        // GetBusinessProfileUseCase'in ownerUserId parametresi aldığını varsayıyoruz
-        getBusinessProfileUseCase(ownerUserId) // invoke(ownerUserId)
-            .collect { profileResult ->
-                when (profileResult) {
+    private suspend fun loadBusinessProfile(targetOwnerId: String) {
+        getBusinessProfileUseCase(targetOwnerId).collect { result ->
+            if (result is Result.Success) {
+                _businessName.value = result.data?.businessName
+            } else if (result is Result.Error) {
+                Timber.e("Failed to load business profile. Default title will be used.")
+            }
+        }
+    }
+
+    private suspend fun loadServices() {
+        Timber.d("Loading customer service catalog...")
+
+        // Fetch ACTIVE services only (Customer Stream)
+        serviceRepository.getCustomerServicesStream()
+            .retryWhen { cause, attempt ->
+                // Retry logic for transient network errors
+                if (attempt < 1 && cause is FirebaseFirestoreException) {
+                    delay(300)
+                    return@retryWhen true
+                }
+                return@retryWhen false
+            }
+            .catch { e ->
+                Timber.e(e, "Error in service stream")
+                _uiState.value = ServiceListUiState.Error(R.string.error_loading_data)
+            }
+            .collect { result ->
+                when (result) {
                     is Result.Success -> {
-                        _businessName.value = profileResult.data?.businessName
-                        Timber.i("ServiceListViewModel: Business name loaded: ${_businessName.value}")
+                        _uiState.value = ServiceListUiState.Success(result.data)
                     }
                     is Result.Error -> {
-                        Timber.e(profileResult.exception, "ServiceListViewModel: Failed to load business name. Message: ${profileResult.message}")
-                        _businessName.value = null // Hata durumunda ismi temizle veya varsayılan bir şey ata
+                        val errorRes = determineFirestoreErrorMessage(result.exception as? Exception)
+                        _uiState.value = ServiceListUiState.Error(errorRes, result.exception as? Exception)
                     }
                     is Result.Loading -> {
-                        Timber.d("ServiceListViewModel: GetBusinessProfileUseCase is Loading business name.")
-                        // _businessName için ayrı bir loading state tutulabilir veya null kalabilir.
+                        _uiState.value = ServiceListUiState.Loading
                     }
                 }
             }
     }
 
-    private suspend fun loadServicesForCurrentUser(authUser: AuthUser) {
-        Timber.d("ServiceListViewModel: Loading services for user: ${authUser.uid}")
-        // repository.getServices()'in Flow<com.stellarforge.composebooking.utils.Result<List<Service>>> döndürdüğünü varsayıyoruz
-        // VE getServices metodunun artık ownerUserId parametresi aldığını varsayalım (eğer servisler kullanıcıya/işletmeye özgüyse)
-        // Eğer getServices() ownerUserId almıyorsa ve tüm servisleri getiriyorsa, o zaman parametresiz çağırın.
-        // Şimdilik, getServices()'ın tüm (aktif) servisleri getirdiğini varsayalım, çünkü işletme profili ayrı yükleniyor.
-        serviceRepository.getServices() // Eğer ownerUserId gerekiyorsa: serviceRepository.getServices(authUser.uid)
-            .retryWhen { cause, attempt ->
-                Timber.d("retryWhen (services): attempt=$attempt, Cause type=${cause::class.simpleName}, Msg=${cause.message}")
-                if (attempt < 1 && cause is FirebaseFirestoreException) { // Sadece 1 kere tekrar dene
-                    if (cause.code == FirebaseFirestoreException.Code.UNAVAILABLE ||
-                        cause.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) { // PERMISSION_DENIED geçici bir token sorunu olabilir
-                        Timber.w(cause, "retryWhen (services): Retriable error. Delaying 300ms for retry.")
-                        delay(300)
-                        return@retryWhen true
-                    }
-                }
-                Timber.d("retryWhen (services): Not retrying for this cause or max attempts reached.")
-                return@retryWhen false
-            }
-            .catch { throwable: Throwable ->
-                Timber.e(throwable, "ServiceListViewModel: Uncaught exception in getServices Flow stream.")
-                val ex = if (throwable is Exception) throwable else Exception("Unexpected throwable: ${throwable.localizedMessage}", throwable)
-                _uiState.value = ServiceListUiState.Error(R.string.error_loading_data, ex)
-            }
-            .collect { serviceLoadResult ->
-                Timber.d("VM Collect (services): Received serviceLoadResult: $serviceLoadResult")
-                when (serviceLoadResult) {
-                    is Result.Success -> {
-                        val services = serviceLoadResult.data
-                        Timber.i("ServiceListViewModel: Successfully loaded ${services.size} services.")
-                        _uiState.value = ServiceListUiState.Success(services)
-                    }
-                    is Result.Error -> {
-                        Timber.e(serviceLoadResult.exception, "ServiceListViewModel: Failed to load services (Result.Error). Message: ${serviceLoadResult.message}")
-                        val errorRes = determineFirestoreErrorMessage(serviceLoadResult.exception)
-                        _uiState.value = ServiceListUiState.Error(errorRes, serviceLoadResult.exception)
-                    }
-                    is Result.Loading -> {
-                        Timber.d("ServiceListViewModel: getServices Flow emitted Loading.")
-                        if (_uiState.value !is ServiceListUiState.Loading) { // Sadece gerçekten gerekliyse Loading'e çek
-                            _uiState.value = ServiceListUiState.Loading
-                        }
-                    }
-                }
-            }
-    }
+    // --- Helper Functions for Error Handling ---
 
     private fun handleUserAuthError(logMessage: String, exception: Exception? = null) {
         Timber.e(exception, "ServiceListViewModel: $logMessage")
         val errorRes = determineAuthErrorMessage(exception)
         _uiState.value = ServiceListUiState.Error(errorRes, exception)
-        _businessName.value = null // Kullanıcı hatası durumunda işletme adını da temizle
     }
 
     private fun determineFirestoreErrorMessage(exception: Exception?): Int {
@@ -190,26 +179,22 @@ class ServiceListViewModel @OptIn(ExperimentalCoroutinesApi::class)
         }
     }
 
+    // --- User Actions ---
+
     fun onRetryClicked() {
-        Timber.d("ServiceListViewModel: Retry button clicked, reloading initial data.")
-        loadInitialData() // Artık genel yükleme fonksiyonunu çağırıyoruz
+        loadInitialData()
     }
 
     fun signOut() {
         viewModelScope.launch {
-            Timber.d("ServiceListViewModel: Signing out user...")
             when (val result = signOutUseCase()) {
                 is Result.Success<*> -> {
-                    Timber.i("ServiceListViewModel: User signed out successfully.")
                     _eventFlow.emit(ServiceListViewEvent.NavigateToLogin)
                 }
                 is Result.Error -> {
-                    Timber.e(result.exception, "ServiceListViewModel: Sign out failed. Message: ${result.message}")
                     _eventFlow.emit(ServiceListViewEvent.ShowSnackbar(R.string.error_sign_out_failed))
                 }
-                is Result.Loading -> {
-                    Timber.d("ServiceListViewModel: SignOutUseCase returned Loading (unexpected for suspend fun).")
-                }
+                is Result.Loading -> { }
             }
         }
     }

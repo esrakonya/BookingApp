@@ -3,11 +3,6 @@ package com.stellarforge.composebooking.ui.screens.servicelist
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,11 +20,27 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
+import com.stellarforge.composebooking.ui.components.AppSnackbarHost
 import com.stellarforge.composebooking.ui.components.CustomerServiceListItem
+import com.stellarforge.composebooking.ui.components.EmptyState
+import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
+/**
+ * The primary **Storefront** screen for Customers.
+ *
+ * **Purpose:**
+ * Displays the list of available services offered by the business.
+ * This is the landing page for a logged-in customer.
+ *
+ * **Features:**
+ * - **Dynamic Branding:** The TopBar title reflects the Business Name fetched from the profile.
+ * - **Real-time Catalog:** Listens to the service stream; updates instantly if the owner changes prices/details.
+ * - **Navigation:** Tapping a service initiates the Booking Flow.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServiceListScreen(
@@ -38,26 +49,31 @@ fun ServiceListScreen(
     onServiceClick: (serviceId: String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val eventFlow = viewModel.eventFlow
 
-    val context = LocalContext.current // Snackbar'da string kaynağı için
+    // Business Name for the Top Bar (Fetched dynamically)
+    val businessName by viewModel.businessName.collectAsState()
+
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    LaunchedEffect(key1 = eventFlow) {
-        eventFlow.collect { event ->
+    // Handle One-time Events (Navigation, Snackbar)
+    LaunchedEffect(key1 = true) {
+        viewModel.eventFlow.collectLatest { event ->
             when (event) {
                 is ServiceListViewEvent.NavigateToLogin -> {
-                    Timber.d("ServiceListScreen: NavigateToLogin event received, navigating to LoginScreen.")
+                    Timber.d("Navigating to Login")
                     navController.navigate(ScreenRoutes.Login.route) {
-                        popUpTo(ScreenRoutes.ServiceList.route) { inclusive = true }
+                        popUpTo(0)
                         launchSingleTop = true
                     }
                 }
                 is ServiceListViewEvent.ShowSnackbar -> {
                     scope.launch {
+                        // Use "error" label if it's a critical failure (like sign out fail)
                         snackbarHostState.showSnackbar(
                             message = context.getString(event.messageResId),
+                            actionLabel = "error",
                             duration = SnackbarDuration.Short
                         )
                     }
@@ -70,81 +86,48 @@ fun ServiceListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    val businessName by viewModel.businessName.collectAsState()
+                    // Display Business Name if loaded, otherwise generic title
                     Text(businessName ?: stringResource(id = R.string.service_list_title))
-                },
-                /*actions = {
-                    IconButton(onClick = {
-                        navController.navigate(ScreenRoutes.MyBookings.route)
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Event,
-                            contentDescription = stringResource(id = R.string.my_bookings_screen_title)
-                        )
-                    }
-
-                    IconButton(onClick = {
-                        navController.navigate(ScreenRoutes.Schedule.route)
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = stringResource(id = R.string.schedule_screen_title)
-                        )
-                    }
-
-                    // YENİ İŞLETME PROFİLİ DÜZENLEME BUTONU
-                    IconButton(onClick = {
-                        navController.navigate(ScreenRoutes.BusinessProfile.route)
-                    }) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings, // Veya ManageAccounts, Storefront vb.
-                            contentDescription = stringResource(id = R.string.action_edit_business_profile) // strings.xml'e ekle
-                        )
-                    }
-
-                    // MEVCUT OTURUMU KAPATMA BUTONU
-                    IconButton(onClick = { viewModel.signOut() }) { // signOut çağrısı zaten NavigateToLogin event'ini tetiklemeli
-                        Icon(
-                            imageVector = Icons.Filled.ExitToApp,
-                            contentDescription = stringResource(id = R.string.sign_out_button_desc)
-                        )
-                    }
-                }*/
+                }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // CUSTOM SNACKBAR HOST
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+
         bottomBar = {
             AppBottomNavigationBar(navController = navController, userRole = "customer")
         }
-    ) { paddingValues ->  
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+    ) { paddingValues ->
+        Box(modifier = Modifier
+            .padding(paddingValues)
+            .fillMaxSize()
+        ) {
             when (val state = uiState) {
+                // 1. Loading State
                 is ServiceListUiState.Loading -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(stringResource(id = R.string.service_list_loading))
-                    }
+                    LoadingIndicator(modifier = Modifier.align(Alignment.Center))
                 }
 
+                // 2. Success State
                 is ServiceListUiState.Success -> {
-                    if (state.services.isEmpty()) { // Servis listesi boşsa
+                    if (state.services.isEmpty()) {
+                        // Empty List
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = stringResource(id = R.string.service_list_empty), // strings.xml'e ekle
+                                text = stringResource(id = R.string.service_list_empty),
                                 style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     } else {
+                        // Service List
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
@@ -160,17 +143,18 @@ fun ServiceListScreen(
                     }
                 }
 
+                // 3. Error State
                 is ServiceListUiState.Error -> {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = stringResource(id = state.messageResId),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center
+                        EmptyState(
+                            messageResId = R.string.service_list_empty,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(onClick = { viewModel.onRetryClicked() }) {

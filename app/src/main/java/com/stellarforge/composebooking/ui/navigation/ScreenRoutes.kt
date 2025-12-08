@@ -1,49 +1,63 @@
 package com.stellarforge.composebooking.ui.navigation
 
-import okhttp3.Route
+/**
+ * Constants for Navigation Arguments.
+ * These keys are used to retrieve data from [SavedStateHandle] in ViewModels.
+ */
 object RouteArgs {
     const val SERVICE_ID = "serviceId"
 }
-// Uygulamadaki farklı ekranları ve rotalarını temsil eden sealed class
-sealed class ScreenRoutes(val route: String) {
-    object ServiceList : ScreenRoutes("service_list")
-    object Login : ScreenRoutes("login")
-    object SignUp : ScreenRoutes("signup")
 
-    object BookingScreen : ScreenRoutes("booking_screen/{serviceId}") {
+/**
+ * A centralized sealed class defining all navigation routes in the application.
+ *
+ * **Structure:**
+ * - Simple routes are defined as objects (e.g., [Login]).
+ * - Routes with arguments are defined as objects with helper functions to construct the path (e.g., [BookingScreen]).
+ */
+sealed class ScreenRoutes(val route: String) {
+
+    // --- INITIALIZATION ---
+    object Splash : ScreenRoutes("splash")
+
+    // --- AUTHENTICATION ---
+    object Login : ScreenRoutes("login") // Customer Login
+    object SignUp : ScreenRoutes("signup") // Customer Sign Up
+    object OwnerLogin : ScreenRoutes("owner_login_screen")
+    object OwnerSignUp : ScreenRoutes("owner_signup_screen")
+
+    // --- CUSTOMER FLOW ---
+    object ServiceList : ScreenRoutes("service_list") // Home / Storefront
+    object MyBookings : ScreenRoutes("my_bookings")
+
+    // Renamed from 'Profile' to 'CustomerProfile' for clarity vs 'BusinessProfile'
+    object CustomerProfile : ScreenRoutes("customer_profile_screen")
+
+    // Route with MANDATORY argument (Path Parameter)
+    object BookingScreen : ScreenRoutes("booking_screen/{${RouteArgs.SERVICE_ID}}") {
         fun createRoute(serviceId: String) = "booking_screen/$serviceId"
     }
 
-    // Rezervasyon onay ekranı
     object BookingConfirmation : ScreenRoutes("booking_confirmation")
 
-    object Splash : ScreenRoutes("splash")
-
+    // --- OWNER FLOW ---
+    object Schedule : ScreenRoutes("schedule") // Owner Dashboard
     object BusinessProfile : ScreenRoutes("business_profile_screen")
+    object ManageServices : ScreenRoutes("manage_services")
 
-    object ManageServices: ScreenRoutes("manage_services")
-
-    object AddEditService: ScreenRoutes("add_edit_service?${RouteArgs.SERVICE_ID}={${RouteArgs.SERVICE_ID}}") {
-        // Bu fonksiyon, navigasyon için tam ve doğru URL'yi oluşturur.
-        // `navController.navigate(AddEditService.createRoute(serviceId = "123"))`
-        fun createRoute(serviceId: String?): String {
+    // Route with OPTIONAL argument (Query Parameter)
+    // Used for both Adding (no ID) and Editing (with ID) a service.
+    object AddEditService : ScreenRoutes("add_edit_service?${RouteArgs.SERVICE_ID}={${RouteArgs.SERVICE_ID}}") {
+        /**
+         * Helper to build the navigation route.
+         * @param serviceId If null, opens in "Add Mode". If provided, opens in "Edit Mode".
+         */
+        fun createRoute(serviceId: String? = null): String {
             return if (serviceId != null) {
-                // Düzenleme modu: serviceId ile git
                 "add_edit_service?${RouteArgs.SERVICE_ID}=$serviceId"
             } else {
-                // Ekleme modu: serviceId olmadan git (query parametresi olmadan)
                 "add_edit_service"
             }
         }
     }
-
-    object MyBookings: ScreenRoutes("my_bookings")
-
-    object Schedule: ScreenRoutes("schedule")
-
-    object Profile: ScreenRoutes("profile_screen")
-
-    object OwnerLogin: ScreenRoutes("owner_login_screen")
-
-    object OwnerSignUp: ScreenRoutes("owner_signup_screen")
 }

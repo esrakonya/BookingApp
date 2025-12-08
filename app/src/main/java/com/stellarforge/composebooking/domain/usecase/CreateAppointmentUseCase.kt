@@ -13,6 +13,16 @@ import java.time.ZoneId
 import java.util.Date
 import javax.inject.Inject
 
+/**
+ * Orchestrates the creation of a new appointment.
+ *
+ * This UseCase acts as a "Gatekeeper" before writing to the database:
+ * 1. **Validation:** Checks if required fields (Name, Phone) are present.
+ * 2. **Data Formatting:** Converts LocalTime to Firestore Timestamp.
+ * 3. **Transaction:** Calls the repository to create both [Appointment] and [BookedSlot] atomically.
+ *
+ * @return [Result.Success] if created, [Result.Error] if validation fails or DB error occurs.
+ */
 class CreateAppointmentUseCase @Inject constructor(
     private val appointmentRepository: AppointmentRepository
 ) {
@@ -30,18 +40,21 @@ class CreateAppointmentUseCase @Inject constructor(
         customerEmail: String?
     ): Result<Unit> {
 
+        // 1. Critical System ID Validation
         if (ownerId.isBlank() || userId.isBlank() || serviceId.isBlank()) {
-            val exception = IllegalArgumentException("Owner, User, or Service ID cannot be blank.")
-            Timber.w(exception)
-            return Result.Error(exception)
+            val msg = "Critical IDs (Owner, User, or Service) are missing. Cannot create appointment."
+            Timber.w(msg)
+            return Result.Error(IllegalArgumentException(msg))
         }
 
+        // 2. User Input Validation
         if (customerName.isBlank() || customerPhone.isBlank()) {
-            val exception = IllegalArgumentException("Customer name and phone cannot be empty.")
-            Timber.w(exception)
-            return Result.Error(exception)
+            val msg = "Customer name and phone number are required."
+            Timber.w(msg)
+            return Result.Error(IllegalArgumentException(msg))
         }
 
+        // 3. Time Calculation & Conversion
         val startLocalDateTime = LocalDateTime.of(date, time)
         val endLocalDateTime = startLocalDateTime.plusMinutes(serviceDuration.toLong())
         val zoneId = ZoneId.systemDefault()
@@ -52,10 +65,11 @@ class CreateAppointmentUseCase @Inject constructor(
             startTimestamp = Timestamp(Date.from(startLocalDateTime.atZone(zoneId).toInstant()))
             endTimestamp = Timestamp(Date.from(endLocalDateTime.atZone(zoneId).toInstant()))
         } catch (e: Exception) {
-            Timber.e(e, "Error creating timestamps from Instant")
-            return Result.Error(Exception("Invalid date/time format when creating Timestamps.", e))
+            Timber.e(e, "Error converting local time to Firestore Timestamp.")
+            return Result.Error(Exception("Invalid date/time format.", e))
         }
 
+        // 4. Object Preparation
         val newAppointment = Appointment(
             ownerId = ownerId,
             userId = userId,
@@ -67,7 +81,7 @@ class CreateAppointmentUseCase @Inject constructor(
             customerName = customerName.trim(),
             customerPhone = customerPhone.trim(),
             customerEmail = customerEmail?.trim()?.takeIf { it.isNotEmpty() },
-            createdAt = null  // @ServerTimestamp bunu dolduracak
+            createdAt = null  // @ServerTimestamp will populate this
         )
 
         val newSlot = BookedSlot(
@@ -75,8 +89,9 @@ class CreateAppointmentUseCase @Inject constructor(
             endTime = endTimestamp
         )
 
-        Timber.d("Attempting to create appointment and slot via a single repository call.")
+        Timber.d("UseCase: Initiating atomic booking transaction...")
 
+        // 5. Execution
         return appointmentRepository.createAppointmentAndSlot(newAppointment, newSlot)
     }
 }

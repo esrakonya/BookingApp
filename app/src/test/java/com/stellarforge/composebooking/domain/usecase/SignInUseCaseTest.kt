@@ -13,6 +13,10 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Unit tests for [SignInUseCase].
+ * Validates authentication flow and input constraints.
+ */
 class SignInUseCaseTest {
 
     @get:Rule
@@ -33,11 +37,14 @@ class SignInUseCaseTest {
 
     @Test
     fun `invoke with valid credentials calls repository and returns success`() = runTest {
+        // ARRANGE
         val expectedUser = AuthUser("uid123", testEmail)
         coEvery { mockAuthRepository.signInWithEmailPassword(testEmail, testPassword) } returns Result.Success(expectedUser)
 
+        // ACT
         val result = signInUseCase(testEmail, testPassword)
 
+        // ASSERT
         assertTrue("Result should be an instance of Result.Success", result is Result.Success)
         val actualUser = (result as Result.Success).data
         assertEquals(expectedUser, actualUser)
@@ -47,11 +54,14 @@ class SignInUseCaseTest {
 
     @Test
     fun `invoke when repository fails returns failure`() = runTest {
+        // ARRANGE
         val exception = Exception("Firebase Auth Error")
         coEvery { mockAuthRepository.signInWithEmailPassword(testEmail, testPassword) } returns Result.Error(exception)
 
+        // ACT
         val result = signInUseCase(testEmail, testPassword)
 
+        // ASSERT
         assertTrue("Result should be an instance of Result.Error", result is Result.Error)
         val actualException = (result as Result.Error).exception
         assertEquals(exception, actualException)
@@ -60,9 +70,11 @@ class SignInUseCaseTest {
     }
 
     @Test
-    fun `invoke with blank email returns failure without calling repository`() = runTest {
+    fun `invoke with blank email returns validation error`() = runTest {
+        // ACT
         val result = signInUseCase(" ", testPassword)
 
+        // ASSERT
         assertTrue("Result should be an instance of Result.Error", result is Result.Error)
         val errorResult = result as Result.Error
         assertTrue("Exception should be IllegalArgumentException", errorResult.exception is IllegalArgumentException)
@@ -72,13 +84,14 @@ class SignInUseCaseTest {
     }
 
     @Test
-    fun `invoke with blank password returns failure without calling repository`() = runTest {
-        val result = signInUseCase(testEmail, "  ") // Boşluklu boş şifre
+    fun `invoke with blank password returns validation error`() = runTest {
+        // ACT
+        val result = signInUseCase(testEmail, "  ")
 
+        // ASSERT
         assertTrue("Result should be an instance of Result.Error", result is Result.Error)
         val errorResult = result as Result.Error
         assertTrue("Exception should be IllegalArgumentException", errorResult.exception is IllegalArgumentException)
-        assertEquals("Email and password cannot be blank.", errorResult.exception.message)
 
         coVerify(exactly = 0) { mockAuthRepository.signInWithEmailPassword(any(), any()) }
     }

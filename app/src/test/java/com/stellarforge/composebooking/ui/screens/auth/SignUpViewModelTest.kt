@@ -1,13 +1,14 @@
 package com.stellarforge.composebooking.ui.screens.auth
 
 import app.cash.turbine.test
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.domain.usecase.SignUpUseCase
+import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import com.stellarforge.composebooking.utils.MainDispatcherRule
-import com.google.firebase.FirebaseNetworkException // Sadece TİPİNİ belirtmek için import
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
-import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.stellarforge.composebooking.utils.Result
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -22,9 +23,13 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Unit tests for [SignUpViewModel] (Customer Registration).
+ *
+ * Checks validation, role assignment ('customer'), and error handling.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SignUpViewModelTest {
 
@@ -36,9 +41,9 @@ class SignUpViewModelTest {
 
     private val testEmail = "newuser@example.com"
     private val testPassword = "password123"
-    private val successUser = AuthUser("uid789", testEmail)
+    private val testRole = "customer"
+    private val successUser = AuthUser("uid789", testEmail, role = testRole)
 
-    // Mock exception'lar
     private val mockNetworkException: FirebaseNetworkException = mockk()
     private val mockUserCollisionException: FirebaseAuthUserCollisionException = mockk()
     private val mockWeakPasswordException: FirebaseAuthWeakPasswordException = mockk()
@@ -49,20 +54,18 @@ class SignUpViewModelTest {
         mockSignUpUseCase = mockk()
         viewModel = SignUpViewModel(mockSignUpUseCase)
 
-        // Varsayılan başarılı signUp
-        coEvery { mockSignUpUseCase(any(), any()) } returns Result.Success(successUser)
-
-        // Mock exception'lar için temel davranışlar
         every { mockNetworkException.localizedMessage } returns "Mocked Network Error"
         every { mockUserCollisionException.localizedMessage } returns "Mocked Email Collision"
         every { mockWeakPasswordException.localizedMessage } returns "Mocked Weak Password"
         every { mockOtherException.localizedMessage } returns "Some other unknown error"
     }
 
+    // --- State Update Tests ---
+
     @Test
     fun `onEmailChange updates email in uiState and clears errors`() = runTest {
         viewModel.onEmailChange("")
-        viewModel.onSignUpClick() // Hata tetikle
+        viewModel.onSignUpClick() // Trigger error
         assertNotNull(viewModel.uiState.value.emailErrorRes)
 
         viewModel.onEmailChange(testEmail)
@@ -77,7 +80,7 @@ class SignUpViewModelTest {
     fun `onPasswordChange updates password in uiState and clears errors`() = runTest {
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange("")
-        viewModel.onConfirmPasswordChange("") // Confirm password'ı da boş bırakalım
+        viewModel.onConfirmPasswordChange("")
         viewModel.onSignUpClick()
         assertNotNull(viewModel.uiState.value.passwordErrorRes)
 
@@ -92,7 +95,7 @@ class SignUpViewModelTest {
     fun `onConfirmPasswordChange updates confirmPassword in uiState and clears errors`() = runTest {
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
-        viewModel.onConfirmPasswordChange(testPassword + "diff") // Farklı şifre ile hata tetikle
+        viewModel.onConfirmPasswordChange(testPassword + "diff")
         viewModel.onSignUpClick()
         assertNotNull(viewModel.uiState.value.confirmPasswordErrorRes)
 
@@ -103,15 +106,17 @@ class SignUpViewModelTest {
         assertNull(state.confirmPasswordErrorRes)
     }
 
-    // --- Validasyon Testleri ---
+    // --- Validation Tests ---
+
     @Test
     fun `onSignUpClick with blank email sets emailErrorRes`() = runTest {
         viewModel.onEmailChange("")
         viewModel.onPasswordChange(testPassword)
         viewModel.onConfirmPasswordChange(testPassword)
         viewModel.onSignUpClick()
+
         assertEquals(R.string.error_email_empty, viewModel.uiState.value.emailErrorRes)
-        coVerify(exactly = 0) { mockSignUpUseCase(any(), any()) }
+        coVerify(exactly = 0) { mockSignUpUseCase(any(), any(), any()) }
     }
 
     @Test
@@ -120,8 +125,9 @@ class SignUpViewModelTest {
         viewModel.onPasswordChange(testPassword)
         viewModel.onConfirmPasswordChange(testPassword)
         viewModel.onSignUpClick()
+
         assertEquals(R.string.error_email_invalid, viewModel.uiState.value.emailErrorRes)
-        coVerify(exactly = 0) { mockSignUpUseCase(any(), any()) }
+        coVerify(exactly = 0) { mockSignUpUseCase(any(), any(), any()) }
     }
 
     @Test
@@ -130,18 +136,20 @@ class SignUpViewModelTest {
         viewModel.onPasswordChange("")
         viewModel.onConfirmPasswordChange("")
         viewModel.onSignUpClick()
+
         assertEquals(R.string.error_password_empty, viewModel.uiState.value.passwordErrorRes)
-        coVerify(exactly = 0) { mockSignUpUseCase(any(), any()) }
+        coVerify(exactly = 0) { mockSignUpUseCase(any(), any(), any()) }
     }
 
     @Test
     fun `onSignUpClick with short password sets passwordErrorRes`() = runTest {
         viewModel.onEmailChange(testEmail)
-        viewModel.onPasswordChange("123") // Kısa şifre
+        viewModel.onPasswordChange("123")
         viewModel.onConfirmPasswordChange("123")
         viewModel.onSignUpClick()
+
         assertEquals(R.string.error_password_short, viewModel.uiState.value.passwordErrorRes)
-        coVerify(exactly = 0) { mockSignUpUseCase(any(), any()) }
+        coVerify(exactly = 0) { mockSignUpUseCase(any(), any(), any()) }
     }
 
     @Test
@@ -150,33 +158,40 @@ class SignUpViewModelTest {
         viewModel.onPasswordChange(testPassword)
         viewModel.onConfirmPasswordChange("differentPassword")
         viewModel.onSignUpClick()
+
         assertEquals(R.string.error_password_mismatch, viewModel.uiState.value.confirmPasswordErrorRes)
-        coVerify(exactly = 0) { mockSignUpUseCase(any(), any()) }
+        coVerify(exactly = 0) { mockSignUpUseCase(any(), any(), any()) }
     }
 
-    // --- UseCase Çağrı Testleri ---
+    // --- UseCase Interaction Tests ---
+
     @Test
-    fun `onSignUpClick with valid input and successful signUp emits NavigateToServiceList`() = runTest {
+    fun `onSignUpClick with valid input and successful signUp emits NavigateTo(ServiceList)`() = runTest {
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
-        viewModel.onConfirmPasswordChange(testPassword) // Eşleşen şifreler
+        viewModel.onConfirmPasswordChange(testPassword)
 
-        // UseCase'in başarılı döneceği setUp'ta ayarlandı.
+        // Expect 'customer' role
+        coEvery { mockSignUpUseCase(testEmail, testPassword, "customer") } returns Result.Success(successUser)
 
         viewModel.eventFlow.test(timeout = 3.seconds) {
             viewModel.onSignUpClick()
-            assertEquals(SignUpViewEvent.NavigateToServiceList, awaitItem())
+
+            val expectedEvent = SignUpViewEvent.NavigateTo(ScreenRoutes.ServiceList.route)
+            assertEquals(expectedEvent, awaitItem())
+
             cancelAndConsumeRemainingEvents()
         }
 
         assertFalse(viewModel.uiState.value.isLoading)
         assertNull(viewModel.uiState.value.generalErrorRes)
-        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword) }
+
+        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword, "customer") }
     }
 
     @Test
     fun `onSignUpClick with valid input and failed signUp (UserCollision) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.Error(mockUserCollisionException)
+        coEvery { mockSignUpUseCase(testEmail, testPassword, "customer") } returns Result.Error(mockUserCollisionException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -187,15 +202,15 @@ class SignUpViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertEquals(R.string.error_auth_email_collision, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword) }
+        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword, "customer") }
     }
 
     @Test
     fun `onSignUpClick with valid input and failed signUp (WeakPassword) sets correct generalErrorRes`() = runTest {
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.Error(mockWeakPasswordException)
+        coEvery { mockSignUpUseCase(testEmail, testPassword, "customer") } returns Result.Error(mockWeakPasswordException)
 
         viewModel.onEmailChange(testEmail)
-        viewModel.onPasswordChange(testPassword) // ViewModel validasyonu geçmeli, Firebase'den hata gelmeli
+        viewModel.onPasswordChange(testPassword)
         viewModel.onConfirmPasswordChange(testPassword)
         viewModel.onSignUpClick()
         runCurrent()
@@ -203,12 +218,12 @@ class SignUpViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertEquals(R.string.error_auth_weak_password, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword) }
+        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword, "customer") }
     }
 
     @Test
     fun `onSignUpClick with valid input and failed signUp (OtherError) sets general signup_failed error`() = runTest {
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } returns Result.Error(mockOtherException)
+        coEvery { mockSignUpUseCase(testEmail, testPassword, "customer") } returns Result.Error(mockOtherException)
 
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
@@ -219,45 +234,36 @@ class SignUpViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertEquals(R.string.error_signup_failed, state.generalErrorRes)
-        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword) }
+        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword, "customer") }
     }
 
     @Test
     fun `onSignUpClick while already loading does not call signUpUseCase again`() = runTest {
-        // Arrange
+        // 1. ARRANGE
         viewModel.onEmailChange(testEmail)
         viewModel.onPasswordChange(testPassword)
-        viewModel.onConfirmPasswordChange(testPassword) // Geçerli inputlar
+        viewModel.onConfirmPasswordChange(testPassword)
 
-        // UseCase'in ilk çağrıda bir süre beklemesini sağla ki isLoading true kalsın
-        // ve ikinci onSignUpClick çağrıldığında isLoading hala true olsun.
-        coEvery { mockSignUpUseCase(testEmail, testPassword) } coAnswers {
-            // isLoading'in true olarak set edildiğini ve ikinci tıklamanın
-            // UseCase'i tekrar tetiklemediğini doğrulamak için bir gecikme ekleyelim.
-            delay(100.milliseconds) // veya daha uzun bir süre, dispatcher'a bağlı
+        coEvery { mockSignUpUseCase(any(), any(), any()) } coAnswers {
+            delay(1000)
             Result.Success(successUser)
         }
 
-        // Act
-        viewModel.onSignUpClick() // İlk çağrı: isLoading true olur, UseCase başlar (ve delay sayesinde hemen bitmez)
+        // 2. ACT - First Click
+        viewModel.onSignUpClick()
 
-        // İlk tıklamadan hemen sonra isLoading'in true olduğunu doğrula
-        // runCurrent() veya advanceUntilIdle() ViewModel'daki launch bloğunun başlamasını sağlar
-        runCurrent() // veya advanceTimeBy(1) // isLoading'in güncellenmesi için
-        assertTrue("isLoading should be true after first click and before use case finishes", viewModel.uiState.value.isLoading)
+        runCurrent()
 
-        viewModel.onSignUpClick() // İkinci çağrı (isLoading hala true iken yapılmalı)
+        assertTrue("isLoading should be true while use case is running", viewModel.uiState.value.isLoading)
 
-        // Assert
-        // signUpUseCase'in sadece bir kez çağrıldığını doğrula
-        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword) }
+        // Second Click
+        viewModel.onSignUpClick()
 
-        // Testin temizlenmesi ve tüm coroutine'lerin bitmesi için
-        advanceUntilIdle() // Gecikmeli UseCase çağrısının tamamlanmasını bekle
+        advanceUntilIdle()
 
-        // Son durumu kontrol et (opsiyonel ama iyi bir pratik)
-        val finalState = viewModel.uiState.value
-        assertFalse("isLoading should be false after use case completes", finalState.isLoading)
-        assertNull("generalErrorRes should be null on success", finalState.generalErrorRes)
+        // 3. ASSERT
+        coVerify(exactly = 1) { mockSignUpUseCase(testEmail, testPassword, "customer") }
+
+        assertFalse(viewModel.uiState.value.isLoading)
     }
 }

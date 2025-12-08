@@ -5,7 +5,15 @@ import com.google.firebase.firestore.PropertyName
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
-// Firestore'daki 'appointments' koleksiyonundaki belgeleri temsil edecek data class
+/**
+ * Represents a confirmed Booking/Appointment entity in the system.
+ * Maps directly to the 'appointments' collection in Firestore.
+ *
+ * **Data Integrity Note:**
+ * Fields like [serviceName] and [servicePriceInCents] are "snapshotted" at the time of booking.
+ * This ensures that even if the business owner changes the service price later,
+ * the historical record of this specific appointment remains accurate.
+ */
 data class Appointment (
     val id: String = "",
 
@@ -18,10 +26,10 @@ data class Appointment (
     @get:PropertyName("serviceId")
     val serviceId: String = "",
 
+    // Snapshotted data (Historical accuracy)
     @get:PropertyName("serviceName")
     val serviceName: String = "",
 
-    // YENİ EKLENEN KRİTİK ALAN
     @get:PropertyName("servicePriceInCents")
     val servicePriceInCents: Long = 0L,
 
@@ -31,6 +39,7 @@ data class Appointment (
     @get:PropertyName("appointmentDateTime")
     val appointmentDateTime: Timestamp = Timestamp.now(),
 
+    // Customer Contact Info (Snapshot)
     @get:PropertyName("customerName")
     val customerName: String = "",
 

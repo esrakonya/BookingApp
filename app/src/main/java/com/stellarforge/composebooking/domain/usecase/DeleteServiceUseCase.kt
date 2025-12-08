@@ -5,25 +5,29 @@ import com.stellarforge.composebooking.utils.Result
 import javax.inject.Inject
 
 /**
- * Belirtilen ID'ye sahip bir servisi silen UseCase
+ * UseCase responsible for permanently deleting a [Service] (Product) from the catalog.
+ *
+ * **Business Logic Note:**
+ * Currently, this operation performs a direct deletion. In a more complex production environment,
+ * you might want to extend this UseCase to check for upcoming appointments linked to this service
+ * and prevent deletion if conflicts exist (Referential Integrity).
  */
 class DeleteServiceUseCase @Inject constructor(
     private val serviceRepository: ServiceRepository
 ) {
     /**
-     * @param serviceId Silinecek servisin Firestore döküman ID'si.
-     * @return İşlemin başarısını veya başarısızlığını belirten bir Result.
+     * Executes the deletion logic.
+     *
+     * @param serviceId The unique Firestore document ID of the service to be deleted.
+     * @return [Result.Success] if deleted, or [Result.Error] if validation fails or DB error occurs.
      */
     suspend operator fun invoke(serviceId: String): Result<Unit> {
-        // ID'nin boş olmadığından emin olalım (ek bir güvenlik katmanı).
+        // 1. Validation: Fail fast on invalid ID
         if (serviceId.isBlank()) {
             return Result.Error(IllegalArgumentException("Service ID cannot be blank for deletion."))
         }
 
-        // Gelecekte eklenebilecek iş mantığı:
-        // 1. Bu servise ait yaklaşan randevuları kontrol et.
-        // 2. Varsa, silmeye izin verme ve kullanıcıya bir hata mesajı göster.
-        // Şimdilik doğrudan silme işlemini çağırıyoruz.
+        // 2. Execution
         return serviceRepository.deleteService(serviceId)
     }
 }

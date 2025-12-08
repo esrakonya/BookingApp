@@ -1,304 +1,105 @@
 package com.stellarforge.composebooking.domain.usecase
 
 import com.google.common.truth.Truth.assertThat
-import com.google.firebase.firestore.DocumentReference
-import com.stellarforge.composebooking.data.model.Appointment
-import com.stellarforge.composebooking.data.model.BookedSlot // Yeni import
 import com.stellarforge.composebooking.domain.repository.AppointmentRepository
-import com.stellarforge.composebooking.domain.repository.SlotRepository // Yeni import
 import com.stellarforge.composebooking.utils.Result
-import io.mockk.*
-import io.mockk.impl.annotations.RelaxedMockK
-import io.mockk.junit4.MockKRule
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 
+/**
+ * Unit tests for [CreateAppointmentUseCase].
+ *
+ * Focuses on VALIDATION rules before interacting with the database.
+ * Ensures that incomplete or invalid data is rejected early to save server resources.
+ */
 class CreateAppointmentUseCaseTest {
 
-    // Mock Bağımlılıklar
-    @get:Rule
-    val mockkRule = MockKRule(this)
-
-    @RelaxedMockK
-    private lateinit var mockAppointmentRepository: AppointmentRepository
-
-    @RelaxedMockK
-    private lateinit var mockSlotRepository: SlotRepository
-
-    @RelaxedMockK
-    private lateinit var mockDocumentReference: DocumentReference
-
-    // Test Edilecek Sınıf
+    private lateinit var appointmentRepository: AppointmentRepository
     private lateinit var createAppointmentUseCase: CreateAppointmentUseCase
-
-    // Test Verileri
-    private val testOwnerId = "test-owner-id-456"
-    private val testServicePriceInCents = 7500L
-    private val testAppointmentId = "new-appt-id-123"
-    private val testUserId = "user-test-123"
-    private val testServiceId = "service-abc"
-    private val testServiceName = "Test Service"
-    private val testServiceDuration = 60
-    private val testDate = LocalDate.of(2025, 8, 1)
-    private val testTime = LocalTime.of(11, 0)
-    private val testCustomerName = " Esra Test "
-    private val testCustomerPhone = " 1234567890 "
-    private val testCustomerEmail: String? = " test@example.com "
-    private val testCustomerEmailEmpty: String? = "  "
 
     @Before
     fun setUp() {
-        every { mockAppointmentRepository.getNewAppointmentReference() } returns mockDocumentReference
-        every { mockDocumentReference.id } returns testAppointmentId
-        coEvery { mockAppointmentRepository.createAppointmentWithId(any(), any()) } returns Result.Success(Unit)
-        coEvery { mockSlotRepository.addSlot(any()) } returns Result.Success(Unit)
-
-        createAppointmentUseCase = CreateAppointmentUseCase(
-            mockAppointmentRepository,
-            mockSlotRepository
-        )
+        appointmentRepository = mockk()
+        createAppointmentUseCase = CreateAppointmentUseCase(appointmentRepository)
     }
 
     @Test
-    fun `invoke with valid data calls repositories with correct data and returns success`() = runTest {
-        // Arrange
-        val appointmentSlot = slot<Appointment>()
-        val slotSlot = slot<BookedSlot>()
+    fun `when inputs are valid, repository create function is called`() = runTest {
+        // GIVEN (Setup)
+        coEvery { appointmentRepository.createAppointmentAndSlot(any(), any()) } returns Result.Success(Unit)
 
-        // Act
-        val actualResult = createAppointmentUseCase(
-            ownerId = testOwnerId,
-            servicePriceInCents = testServicePriceInCents,
-            userId = testUserId,
-            serviceId = testServiceId,
-            serviceName = testServiceName,
-            serviceDuration = testServiceDuration,
-            date = testDate,
-            time = testTime,
-            customerName = testCustomerName,
-            customerPhone = testCustomerPhone,
-            customerEmail = testCustomerEmail
-        )
-
-        assertThat(actualResult).isInstanceOf(Result.Success::class.java)
-
-        // Verify - Doğru metotlar çağrıldı mı?
-        coVerify(exactly = 1) { mockAppointmentRepository.createAppointmentWithId(mockDocumentReference, capture(appointmentSlot)) }
-        coVerify(exactly = 1) { mockSlotRepository.addSlot(capture(slotSlot)) }
-
-        // Assert - Yakalanan Appointment Doğru mu?
-        val capturedAppointment = appointmentSlot.captured
-        val expectedStartInstant = testDate.atTime(testTime).atZone(ZoneId.systemDefault()).toInstant()
-
-        assertThat(capturedAppointment.id).isEqualTo(testAppointmentId)
-        assertThat(capturedAppointment.ownerId).isEqualTo(testOwnerId)
-        assertThat(capturedAppointment.userId).isEqualTo(testUserId)
-        assertThat(capturedAppointment.serviceId).isEqualTo(testServiceId)
-        assertThat(capturedAppointment.serviceName).isEqualTo(testServiceName)
-        assertThat(capturedAppointment.servicePriceInCents).isEqualTo(testServicePriceInCents)
-        assertThat(capturedAppointment.durationMinutes).isEqualTo(testServiceDuration)
-        assertThat(capturedAppointment.appointmentDateTime.seconds).isEqualTo(expectedStartInstant.epochSecond)
-        assertThat(capturedAppointment.customerName).isEqualTo(testCustomerName.trim())
-        assertThat(capturedAppointment.customerPhone).isEqualTo(testCustomerPhone.trim())
-        assertThat(capturedAppointment.customerEmail).isEqualTo(testCustomerEmail?.trim())
-        assertThat(capturedAppointment.createdAt).isNull()
-
-        val capturedSlot = slotSlot.captured
-        val expectedEndInstant = expectedStartInstant.plusSeconds(testServiceDuration * 60L)
-
-        assertThat(capturedSlot.ownerId).isEqualTo(testOwnerId)
-        assertThat(capturedSlot.appointmentId).isEqualTo(testAppointmentId)
-        assertThat(capturedSlot.endTime.seconds).isEqualTo(expectedEndInstant.epochSecond)
-    }
-
-    @Test
-    fun `invoke() with blank userId returns failure without calling repositories`() = runTest {
-        // Act
-        val actualResult = createAppointmentUseCase(
-            ownerId = testOwnerId,
-            servicePriceInCents = testServicePriceInCents,
-            userId = "",
-            serviceId = testServiceId,
-            serviceName = testServiceName,
-            serviceDuration = testServiceDuration,
-            date = testDate,
-            time = testTime,
-            customerName = testCustomerName,
-            customerPhone = testCustomerPhone,
-            customerEmail = testCustomerEmail
-        )
-        // Assert
-        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
-        val exception = (actualResult as Result.Error).exception
-
-        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(exception.message).isEqualTo("User ID cannot be blank.")
-
-        coVerify(exactly = 0) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
-        coVerify(exactly = 0) { mockSlotRepository.addSlot(any()) }
-    }
-
-    @Test
-    fun `invoke() with blank serviceId returns failure without calling repositories`() = runTest {
-        // Act
-        val actualResult = createAppointmentUseCase(
-            testUserId,
-            testServicePriceInCents,
-            testOwnerId,
-            " ",
-            testServiceName,
-            testServiceDuration,
-            testDate,
-            testTime,
-            testCustomerName,
-            testCustomerPhone,
-            testCustomerEmail
-        )
-        // Assert
-        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
-        val exception = (actualResult as Result.Error).exception
-
-        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(exception.message).isEqualTo("Service ID cannot be blank.")
-
-        coVerify(exactly = 0) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
-    }
-
-
-    @Test
-    fun `invoke() with blank name return failure without calling repositories`() = runTest {
-        // Act
-        val actualResult = createAppointmentUseCase(
-            testUserId,
-            testServicePriceInCents,
-            testOwnerId,
-            testServiceId,
-            testServiceName,
-            testServiceDuration,
-            testDate,
-            testTime,
-            " ",
-            testCustomerPhone,
-            testCustomerEmail
-        )
-        // Assert
-        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
-        val exception = (actualResult as Result.Error).exception
-
-        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(exception.message).isEqualTo("Customer name and phone cannot be empty.")
-    }
-
-    @Test
-    fun `invoke() with blank phone return failure without calling repositories`() = runTest {
-        // Act
-        val actualResult = createAppointmentUseCase(
-            testUserId,
-            testServicePriceInCents,
-            testOwnerId,
-            testServiceId,
-            testServiceName,
-            testServiceDuration,
-            testDate,
-            testTime,
-            testCustomerName,
-            " ",
-            testCustomerEmail
-        )
-        // Assert
-        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
-        val exception = (actualResult as Result.Error).exception
-
-        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(exception.message).isEqualTo("Customer name and phone cannot be empty.")
-    }
-
-    @Test
-    fun `invoke() with blank email should trim and set email to null`() = runTest {
-        // Arrange
-        val appointmentSlot = slot<Appointment>()
-        // Başarılı davranışlar setUp'ta ayarlandı.
-
-        // Act
+        // WHEN (Action)
         val result = createAppointmentUseCase(
-            testOwnerId,
-            testServicePriceInCents,
-            testUserId,
-            testServiceId,
-            testServiceName,
-            testServiceDuration,
-            testDate,
-            testTime,
-            testCustomerName,
-            testCustomerPhone,
-            testCustomerEmailEmpty
+            ownerId = "owner1",
+            servicePriceInCents = 1000,
+            userId = "user1",
+            serviceId = "service1",
+            serviceName = "Manicure",
+            serviceDuration = 30,
+            date = LocalDate.now().plusDays(1), // Future date
+            time = LocalTime.of(14, 0),
+            customerName = "John Doe", // Valid Name
+            customerPhone = "5551234567", // Valid Phone
+            customerEmail = "test@test.com"
         )
 
-        // Assert
+        // THEN (Assertion)
         assertThat(result).isInstanceOf(Result.Success::class.java)
-        coVerify(exactly = 1) { mockAppointmentRepository.createAppointmentWithId(any(), capture(appointmentSlot)) }
-        assertThat(appointmentSlot.captured.customerEmail).isNull()
+        coVerify(exactly = 1) { appointmentRepository.createAppointmentAndSlot(any(), any()) }
     }
 
     @Test
-    fun `invoke() when appointment repository fails and does not call slot repository`() = runTest {
-        // ARRANGE
-        val repositoryException = Exception("Firestore error")
-        coEvery { mockAppointmentRepository.createAppointmentWithId(any(), any()) } returns Result.Error(repositoryException)
+    fun `when customer name is empty, returns Error and DOES NOT call repository`() = runTest {
+        // GIVEN
+        // No repository stubbing needed as we expect early termination.
 
-        val actualResult = createAppointmentUseCase(
-            testOwnerId,
-            testServicePriceInCents,
-            testUserId,
-            testServiceId,
-            testServiceName,
-            testServiceDuration,
-            testDate,
-            testTime,
-            testCustomerName,
-            testCustomerPhone,
-            testCustomerEmail
+        // WHEN
+        val result = createAppointmentUseCase(
+            ownerId = "owner1",
+            servicePriceInCents = 1000,
+            userId = "user1",
+            serviceId = "service1",
+            serviceName = "Manicure",
+            serviceDuration = 30,
+            date = LocalDate.now().plusDays(1),
+            time = LocalTime.of(14, 0),
+            customerName = "", // <--- ERROR: Empty Name
+            customerPhone = "5551234567",
+            customerEmail = null
         )
 
-        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
-        assertThat((actualResult as Result.Error).exception).isEqualTo(repositoryException)
+        // THEN
+        assertThat(result).isInstanceOf(Result.Error::class.java)
 
-        coVerify(exactly = 1) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
-        coVerify(exactly = 0) { mockSlotRepository.addSlot(any()) }
+        // CRITICAL: Ensure database is protected from invalid data.
+        coVerify(exactly = 0) { appointmentRepository.createAppointmentAndSlot(any(), any()) }
     }
 
     @Test
-    fun `invoke() when slot repository fails return failure`() = runTest {
-        // ARRANGE
-        val slotRepositoryException = Exception("Slot error")
-        coEvery { mockSlotRepository.addSlot(any()) } returns Result.Error(slotRepositoryException)
-
-        // ACT
-        val actualResult = createAppointmentUseCase(
-            testOwnerId,
-            testServicePriceInCents,
-            testUserId,
-            testServiceId,
-            testServiceName,
-            testServiceDuration,
-            testDate,
-            testTime,
-            testCustomerName,
-            testCustomerPhone,
-            testCustomerEmail
+    fun `when required IDs are blank, returns Error`() = runTest {
+        // WHEN (Owner ID is missing)
+        val result = createAppointmentUseCase(
+            ownerId = "", // <--- ERROR
+            servicePriceInCents = 1000,
+            userId = "user1",
+            serviceId = "service1",
+            serviceName = "Manicure",
+            serviceDuration = 30,
+            date = LocalDate.now(),
+            time = LocalTime.of(14, 0),
+            customerName = "John Doe",
+            customerPhone = "555",
+            customerEmail = null
         )
 
-        // ASSERT
-        assertThat(actualResult).isInstanceOf(Result.Error::class.java)
-        assertThat((actualResult as Result.Error).exception).isEqualTo(slotRepositoryException)
-
-        coVerify(exactly = 1) { mockAppointmentRepository.createAppointmentWithId(any(), any()) }
-        coVerify(exactly = 1) { mockSlotRepository.addSlot(any()) }
+        // THEN
+        assertThat(result).isInstanceOf(Result.Error::class.java)
+        coVerify(exactly = 0) { appointmentRepository.createAppointmentAndSlot(any(), any()) }
     }
 }

@@ -24,11 +24,21 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * Manages the UI state for the **Business Owner Login** screen.
+ *
+ * **Responsibilities:**
+ * - Authentication: handling email/password input and validation.
+ * - **Security / Role Enforcement:** Strictly checks if the authenticated user has the "owner" role.
+ *   If a "customer" tries to log in via this portal, access is denied and the session is cleared.
+ * - Error Handling: Maps Firebase exceptions to user-friendly UI messages.
+ */
 @HiltViewModel
 class OwnerLoginViewModel @Inject constructor(
     private val signInUseCase: SignInUseCase,
     private val signOutUseCase: SignOutUseCase
 ) : ViewModel() {
+
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
@@ -36,7 +46,7 @@ class OwnerLoginViewModel @Inject constructor(
     val eventFlow: SharedFlow<LoginViewEvent> = _eventFlow.asSharedFlow()
 
     init {
-        Timber.d("LoginViewModel initialized.")
+        Timber.d("OwnerLoginViewModel initialized.")
     }
 
     fun onEmailChange(email: String) {
@@ -49,6 +59,7 @@ class OwnerLoginViewModel @Inject constructor(
 
     fun onLoginClick() {
         val currentState = _uiState.value
+        // Prevent duplicate requests
         if (currentState.isLoading) {
             Timber.d("Login attempt while already loading. Ignoring.")
             return
@@ -61,6 +72,8 @@ class OwnerLoginViewModel @Inject constructor(
 
     private fun validateInput(state: LoginUiState): Boolean {
         var isValid = true
+
+        // Email Validation
         val newEmailError: Int? = if (state.email.isBlank()) {
             isValid = false
             R.string.error_email_empty
@@ -71,6 +84,7 @@ class OwnerLoginViewModel @Inject constructor(
             null
         }
 
+        // Password Validation
         val newPasswordError: Int? = if (state.password.isBlank()) {
             isValid = false
             R.string.error_password_empty
@@ -78,7 +92,7 @@ class OwnerLoginViewModel @Inject constructor(
             null
         }
 
-        // Sadece state değiştiyse güncelleme yapalım
+        // Only update state if errors changed
         if (newEmailError != state.emailErrorRes || newPasswordError != state.passwordErrorRes) {
             _uiState.update {
                 it.copy(emailErrorRes = newEmailError, passwordErrorRes = newPasswordError)
@@ -91,45 +105,41 @@ class OwnerLoginViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, generalErrorRes = null) }
 
         viewModelScope.launch {
-            Timber.d("Attempting sign in for email: $email")
-            // SignInUseCase'in `suspend operator fun invoke(...): Result<AuthUser>` döndürdüğünü varsayıyoruz.
+            Timber.d("Attempting owner sign in for: $email")
+
             when (val result = signInUseCase(email, password)) {
                 is Result.Success -> {
                     val user = result.data
 
-                    // --- YENİ ROL KONTROLÜ ---
+                    // --- SECURITY: ROLE CHECK ---
                     if (user.role == "owner") {
-                        // Rol doğru (işletme sahibi), devam et.
+                        // Correct role -> Access Granted -> Navigate to Dashboard
                         Timber.i("Owner sign in successful for: ${user.uid}")
                         _uiState.update { it.copy(isLoading = false) }
                         _eventFlow.emit(LoginViewEvent.NavigateTo(ScreenRoutes.Schedule.route))
                     } else {
-                        // Rol yanlış (müşteri işletme sahibi girişinden girmeye çalışıyor).
-                        Timber.w("Customer (role=${user.role}) attempted to sign in via owner login.")
+                        // Incorrect role (Customer tried to use Owner portal) -> Access Denied
+                        Timber.w("Security Alert: Customer (role=${user.role}) attempted to sign in via owner login.")
                         _uiState.update { it.copy(isLoading = false) }
                         _eventFlow.emit(LoginViewEvent.ShowSnackbar(R.string.error_auth_customer_at_owner_login))
-                        // Çıkış yaptırarak Auth state'ini temizle.
+
+                        // Force sign out to clear the invalid session
                         signOutUseCase()
                     }
                 }
                 is Result.Error -> {
-                    // Hatalı giriş, result.exception ve result.message kullanılabilir
-                    Timber.w(result.exception, "Sign in failed for email: $email. Message: ${result.message}")
+                    Timber.w(result.exception, "Owner sign in failed. Message: ${result.message}")
                     val errorRes = when (result.exception) {
                         is FirebaseNetworkException -> R.string.error_network_connection
                         is FirebaseAuthInvalidCredentialsException -> R.string.error_auth_invalid_credentials
-                        is FirebaseAuthInvalidUserException -> R.string.error_auth_invalid_credentials // Veya yine invalid_credentials
-                        is IllegalArgumentException -> R.string.error_auth_generic_signup // Validasyon hatası UseCase'den geliyorsa
-                        else -> R.string.error_login_failed // Diğer genel hatalar
+                        is FirebaseAuthInvalidUserException -> R.string.error_auth_invalid_credentials
+                        is IllegalArgumentException -> R.string.error_auth_generic_signup
+                        else -> R.string.error_login_failed
                     }
                     _uiState.update { it.copy(isLoading = false, generalErrorRes = errorRes) }
                 }
                 is Result.Loading -> {
-                    // Bu case'in `suspend fun` bir UseCase için çalışması beklenmez.
-                    // UseCase ya Success ya da Error döndürmelidir.
-                    // Eğer UseCase'iniz Flow döndürüyorsa bu durum geçerli olurdu.
-                    Timber.d("SignInUseCase returned Loading state (unexpected for a direct suspend function result).")
-                    // UI'da zaten isLoading = true olduğu için ek bir güncelleme gerekmeyebilir.
+                    // Should not happen for this UseCase
                 }
             }
         }

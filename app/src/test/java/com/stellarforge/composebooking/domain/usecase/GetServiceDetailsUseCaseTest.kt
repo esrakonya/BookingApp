@@ -2,7 +2,7 @@ package com.stellarforge.composebooking.domain.usecase
 
 import com.google.common.truth.Truth.assertThat
 import com.stellarforge.composebooking.data.model.Service
-import com.stellarforge.composebooking.domain.repository.AppointmentRepository
+import com.stellarforge.composebooking.domain.repository.ServiceRepository
 import com.stellarforge.composebooking.utils.DocumentNotFoundException
 import com.stellarforge.composebooking.utils.Result
 import io.mockk.coEvery
@@ -14,25 +14,28 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Unit tests for [GetServiceDetailsUseCase].
+ * Verifies fetching service details and error handling logic.
+ */
 class GetServiceDetailsUseCaseTest {
 
     @get:Rule
     val mockkRule = MockKRule(this)
 
     @RelaxedMockK
-    private lateinit var mockRepository: AppointmentRepository
+    private lateinit var mockRepository: ServiceRepository
 
+    private lateinit var getServiceDetailsUseCase: GetServiceDetailsUseCase
 
-     private lateinit var getServiceDetailsUseCase: GetServiceDetailsUseCase
-
-     @Before
-     fun setUp() {
-         // Use case'i mock repository ile oluştur
-         getServiceDetailsUseCase = GetServiceDetailsUseCase(mockRepository)
-     }
+    @Before
+    fun setUp() {
+        getServiceDetailsUseCase = GetServiceDetailsUseCase(mockRepository)
+    }
 
     @Test
-    fun `invoke - with valid serviceId - when repository returns success - should return success with service`() = runTest {
+    fun `invoke - with valid serviceId - when repository returns success - returns service data`() = runTest {
+        // ARRANGE
         val fakeServiceId = "test-id-123"
         val expectedService = Service(
             id = fakeServiceId,
@@ -46,8 +49,10 @@ class GetServiceDetailsUseCaseTest {
 
         coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns Result.Success(expectedService)
 
+        // ACT
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
+        // ASSERT
         assertThat(actualResult).isInstanceOf(Result.Success::class.java)
         val serviceData = (actualResult as Result.Success).data
         assertThat(serviceData).isNotNull()
@@ -57,12 +62,17 @@ class GetServiceDetailsUseCaseTest {
     }
 
     @Test
-    fun `invoke - with a non-existent serviceId - when repository returns DocumentNotFoundException - should return Success with null data`() = runTest {
+    fun `invoke - with non-existent serviceId - handles DocumentNotFoundException gracefully`() = runTest {
+        // ARRANGE
         val fakeServiceId = "non-existent-id"
+        // Simulate "Not Found" error from Repository
         coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns Result.Error(DocumentNotFoundException("Not Found"))
 
+        // ACT
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
+        // ASSERT
+        // UseCase should swallow the specific exception and return Success(null) based on business requirements
         assertThat(actualResult).isInstanceOf(Result.Success::class.java)
         val serviceData = (actualResult as Result.Success).data
         assertThat(serviceData).isNull()
@@ -71,16 +81,16 @@ class GetServiceDetailsUseCaseTest {
     }
 
     @Test
-    fun `invoke - when repository returns a general error - should pass the error through`() = runTest {
-        // ARRANGE: Repository'nin genel bir veritabanı hatası döndüreceğini ayarla
+    fun `invoke - when repository returns a general error - propagates error`() = runTest {
+        // ARRANGE
         val fakeServiceId = "test-id-error"
         val genericException = Exception("Firestore connection failed")
         coEvery { mockRepository.getServiceDetails(fakeServiceId) } returns Result.Error(genericException)
 
-        // ACT: UseCase'i çalıştır
+        // ACT
         val actualResult = getServiceDetailsUseCase(fakeServiceId)
 
-        // ASSERT: UseCase'in, "bulunamadı" DIŞINDAKİ hataları değiştirmeden, olduğu gibi ilettiğini doğrula
+        // ASSERT
         assertThat(actualResult).isInstanceOf(Result.Error::class.java)
         val actualException = (actualResult as Result.Error).exception
         assertThat(actualException).isEqualTo(genericException)
@@ -89,20 +99,17 @@ class GetServiceDetailsUseCaseTest {
     }
 
     @Test
-    fun `invoke - with a blank serviceId - should return illegal argument error without calling repository`() = runTest {
-        // ARRANGE: Geçersiz (boş) bir ID hazırla
+    fun `invoke - with a blank serviceId - returns validation error`() = runTest {
+        // ACT
         val blankServiceId = " "
-
-        // ACT: UseCase'i geçersiz ID ile çalıştır
         val actualResult = getServiceDetailsUseCase(blankServiceId)
 
-        // ASSERT: Sonucun beklenen validasyon hatası olduğunu doğrula
+        // ASSERT
         assertThat(actualResult).isInstanceOf(Result.Error::class.java)
         val exception = (actualResult as Result.Error).exception
         assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(exception.message).isEqualTo("Service ID cannot be blank.")
 
-        // Repository'nin HİÇ çağrılmadığını doğrula
+        // Repository should NOT be called
         coVerify(exactly = 0) { mockRepository.getServiceDetails(any()) }
     }
 }

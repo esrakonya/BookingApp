@@ -22,7 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -36,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.ui.components.AppSnackbarHost
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import kotlinx.coroutines.launch
 
@@ -57,16 +57,22 @@ fun AddEditServiceScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    uiState.error?.let { error ->
-        val context = LocalContext.current
-        LaunchedEffect(error) {
+    // Listen for errors and show Snackbar
+    uiState.error?.let { errorResId ->
+        val errorMessage = stringResource(id = errorResId)
+        LaunchedEffect(errorResId) {
             scope.launch {
-                snackbarHostState.showSnackbar(message = error)
+                snackbarHostState.showSnackbar(
+                    message = errorMessage,
+                    actionLabel = "error", // Trigger for colored Snackbar
+                    duration = SnackbarDuration.Short
+                )
                 viewModel.clearError()
             }
         }
     }
 
+    // Navigate back on successful save
     LaunchedEffect(uiState.serviceSaved) {
         if (uiState.serviceSaved) {
             navController.popBackStack()
@@ -76,7 +82,7 @@ fun AddEditServiceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = uiState.screenTitle) },
+                title = { Text(text = stringResource(id = uiState.screenTitle)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(id = R.string.action_navigate_back))
@@ -84,7 +90,9 @@ fun AddEditServiceScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        // CUSTOM SNACKBAR HOST
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+
         bottomBar = {
             Surface(tonalElevation = 4.dp, shadowElevation = 4.dp) {
                 Button(
@@ -93,7 +101,7 @@ fun AddEditServiceScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(52.dp)
+                        .height(56.dp) // Standard height 56dp
                 ) {
                     if (uiState.isSaving) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
@@ -142,14 +150,25 @@ fun ServiceForm(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         OutlinedTextField(
+            value = uiState.name,
+            onValueChange = onNameChanged,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(id = R.string.add_edit_service_name_label)) },
+            placeholder = { Text(stringResource(id = R.string.add_edit_service_name_placeholder)) },
+            singleLine = true
+        )
+
+        OutlinedTextField(
             value = uiState.description,
             onValueChange = onDescriptionChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp),
+                .height(120.dp), // Height for multi-line field
             label = { Text(stringResource(id = R.string.add_edit_service_description_label)) },
             placeholder = { Text(stringResource(id = R.string.add_edit_service_description_placeholder)) },
+            maxLines = 5
         )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -159,7 +178,7 @@ fun ServiceForm(
                 onValueChange = onDurationChange,
                 modifier = Modifier.weight(1f),
                 label = { Text(stringResource(id = R.string.add_edit_service_duration_label)) },
-                suffix = { Text("dk.") },
+                suffix = { Text(stringResource(id = R.string.unit_minutes_short)) }, // "min"
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
             )
@@ -169,7 +188,7 @@ fun ServiceForm(
                 onValueChange = onPriceChange,
                 modifier = Modifier.weight(1f),
                 label = { Text(stringResource(id = R.string.add_edit_service_price_label)) },
-                prefix = { Text("₺") },
+                prefix = { Text(stringResource(id = R.string.currency_symbol)) }, // "$" or "₺"
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
             )
@@ -180,7 +199,10 @@ fun ServiceForm(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(stringResource(id = R.string.add_edit_service_active_label), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = stringResource(id = R.string.add_edit_service_active_label),
+                style = MaterialTheme.typography.bodyLarge
+            )
             Switch(
                 checked = uiState.isActive,
                 onCheckedChange = onIsActiveChange

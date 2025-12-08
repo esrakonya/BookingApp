@@ -1,6 +1,4 @@
-import com.android.build.gradle.internal.utils.isKspPluginApplied
 
-// app/build.gradle.kts
 
 plugins {
     alias(libs.plugins.android.application)
@@ -12,12 +10,12 @@ plugins {
 
 android {
     namespace = "com.stellarforge.composebooking"
-    compileSdk = 35 // Gerekli en düşük SDK
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.stellarforge.composebooking"
-        minSdk = 21
-        targetSdk = 34 // compileSdk ile aynı olması önerilir
+        minSdk = 23
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -29,7 +27,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // Başlangıç için
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -39,7 +37,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-        isCoreLibraryDesugaringEnabled = true // java.time için
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "1.8"
@@ -59,50 +57,36 @@ android {
 }
 
 dependencies {
-    // Core Library Desugaring
+    // --- CORE & LIFECYCLE ---
     coreLibraryDesugaring(libs.android.desugarJdkLibs)
-
-    // Temel AndroidX & Lifecycle
-    implementation(libs.androidx.core.ktx) // Artık doğru sürümü kullanmalı
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    // Compose (BOM ve Bundle)
+    // --- UI: COMPOSE ---
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.bundles.compose)
-    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.bundles.compose) 
+    implementation(libs.coil.compose)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.calendar.compose)
 
-    // Coroutines (Bundle)
-    implementation(libs.bundles.coroutines)
-
-    // Hilt
+    // --- ARCHITECTURE & DI ---
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+    implementation(libs.javax.inject)
 
-    // Firebase (BOM)
+    // --- FIREBASE ---
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
 
-    // Coil
-    implementation(libs.coil.compose)
-
-    // Javax Inject
-    implementation(libs.javax.inject)
-
-    // Test Bağımlılıkları
-    testImplementation(libs.junit)
-    testImplementation(libs.bundles.unitTest)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.bundles.androidTest) // Alias düzeltildi
-    debugImplementation(libs.bundles.debug)
-
+    // --- UTILS ---
     implementation(libs.timber)
 
-    //implementation("androidx.compose.material:material-icons-core:1.6.7")
-    //implementation("androidx.compose.material:material-icons-extended:1.6.7")
-    implementation("com.kizitonwose.calendar:compose:2.5.2")
-
-    testImplementation ("com.google.truth:truth:1.1.3")
+    // --- TESTING ---
+    testImplementation(libs.bundles.unitTest)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.bundles.androidTest)
+    debugImplementation(libs.bundles.debug)
 
 }

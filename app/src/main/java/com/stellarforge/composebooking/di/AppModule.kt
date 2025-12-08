@@ -4,7 +4,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.stellarforge.composebooking.utils.FirebaseConstants
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -13,11 +12,19 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import javax.inject.Singleton
 
+/**
+ * Hilt Module for providing external dependencies (Third-party libraries, System services).
+ *
+ * **Role:**
+ * Unlike [DataModule] which binds interfaces to implementations, this module uses [@Provides]
+ * to create instances of classes we do not own (e.g., Firebase, CoroutineDispatchers).
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
     // --- Firebase Providers ---
+
     @Provides
     @Singleton
     fun provideFirestore(): FirebaseFirestore {
@@ -30,19 +37,9 @@ object AppModule {
         return FirebaseAuth.getInstance()
     }
 
-    @Module
-    @InstallIn(SingletonComponent::class)
-    object AppModule { // Veya FirebaseModule
-        @Provides
-        @Singleton
-        fun provideFirebaseConstants(): FirebaseConstants {
-            return FirebaseConstants // Object olduğu için direkt döndür
-        }
-    }
-
-    // Not: FirebaseConstants'ı enjekte etmeye gerek yok, doğrudan kullanılabilir.
-
     // --- Coroutine Dispatcher Providers ---
+    // Injecting dispatchers makes testing easier (we can swap them with TestDispatchers).
+
     @Provides
     @Singleton
     @IoDispatcher
@@ -52,4 +49,9 @@ object AppModule {
     @Singleton
     @DefaultDispatcher
     fun provideDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
+
+    @Provides
+    @Singleton
+    @MainDispatcher
+    fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
 }

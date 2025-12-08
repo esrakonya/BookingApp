@@ -1,4 +1,3 @@
-// Top-level build.gradle.kts (Project Level)
 
 plugins {
     alias(libs.plugins.android.application) apply false

@@ -12,6 +12,9 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Unit tests for [SignOutUseCase].
+ */
 class SignOutUseCaseTest {
 
     @get:Rule
@@ -28,17 +31,20 @@ class SignOutUseCaseTest {
     }
 
     @Test
-    fun `invoke calls repository and returns success when repository succeeds`() = runTest {
+    fun `invoke calls repository and returns success`() = runTest {
+        // ARRANGE
         coEvery { mockAuthRepository.signOut() } returns Result.Success(Unit)
 
+        // ACT
         val result = signOutUseCase()
 
+        // ASSERT
         assertTrue("Result should be an instance of Result.Success", result is Result.Success)
         coVerify(exactly = 1) { mockAuthRepository.signOut() }
     }
 
     @Test
-    fun `invoke calls repository and returns failure when repository fails`() = runTest {
+    fun `invoke calls repository and returns failure on error`() = runTest {
         // ARRANGE
         val expectedException = Exception("Sign out error")
         coEvery { mockAuthRepository.signOut() } returns Result.Error(expectedException)
@@ -47,12 +53,8 @@ class SignOutUseCaseTest {
         val result = signOutUseCase()
 
         // ASSERT
-        // DÜZELTİLDİ:
         assertTrue("Result should be an instance of Result.Error", result is Result.Error)
         val errorResult = result as Result.Error
-
-        // Exception türünü kontrol etmeye gerek yok, çünkü tam olarak hangi exception'ı beklediğimizi biliyoruz.
-        // Doğrudan exception nesnelerini karşılaştıralım.
         assertEquals(expectedException, errorResult.exception)
 
         coVerify(exactly = 1) { mockAuthRepository.signOut() }

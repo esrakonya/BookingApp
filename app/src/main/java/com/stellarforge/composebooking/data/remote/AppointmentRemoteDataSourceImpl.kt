@@ -18,6 +18,17 @@ import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 
+/**
+ * Concrete implementation of [AppointmentRemoteDataSource] using Cloud Firestore.
+ *
+ * Responsibilities:
+ * - Handles raw CRUD operations for the 'appointments' collection.
+ * - **Atomic Transactions:** Uses Firestore Batch Writes to ensure that an Appointment
+ *   and its corresponding BookedSlot are created simultaneously. This prevents data inconsistency.
+ * - **Real-time Data:** Provides a reactive stream of user bookings.
+ *
+ * @param firestore The Firestore instance injected via Hilt.
+ */
 class AppointmentRemoteDataSourceImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : AppointmentRemoteDataSource {
@@ -48,7 +59,7 @@ class AppointmentRemoteDataSourceImpl @Inject constructor(
             }
             Result.Success(appointments)
         } catch (e: Exception) {
-            Result.Error(e, "Randevular alınamadı.")
+            Result.Error(e, "Failed to fetch appointments.")
         }
     }
 
@@ -58,7 +69,7 @@ class AppointmentRemoteDataSourceImpl @Inject constructor(
             .orderBy("appointmentDateTime", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(Result.Error(error, "Randevularım alınamadı."))
+                    trySend(Result.Error(error, "Failed to fetch my bookings."))
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -68,7 +79,7 @@ class AppointmentRemoteDataSourceImpl @Inject constructor(
                         }
                         trySend(Result.Success(bookings))
                     } catch (e: Exception) {
-                        trySend(Result.Error(e, "Randevu verileri işlenemedi."))
+                        trySend(Result.Error(e, "Error processing booking data."))
                     }
                 }
             }
@@ -81,7 +92,7 @@ class AppointmentRemoteDataSourceImpl @Inject constructor(
             Result.Success(Unit)
         } catch (e: Exception) {
             Timber.e(e, "Error deleting appointment with ID: $appointmentId")
-            Result.Error(e, "Randevu kaydı silinemedi.")
+            Result.Error(e, "Failed to delete appointment.")
         }
     }
 
@@ -103,8 +114,7 @@ class AppointmentRemoteDataSourceImpl @Inject constructor(
             Result.Success(Unit)
         } catch (e: Exception) {
             Timber.e(e, "Failed to create appointment and slot in a batch write.")
-            Result.Error(e, "Randevu oluşturulurken bir hata oluştu.")
+            Result.Error(e, "Error creating appointment.")
         }
     }
-
 }

@@ -16,16 +16,34 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-
 import javax.inject.Inject
 
+/**
+ * Concrete implementation of [BusinessProfileRepository].
+ *
+ * This repository handles the data flow for the Business Profile (Storefront).
+ *
+ * **Key Features:**
+ * - **Reactive Streams:** Uses Firestore `snapshots()` to provide a live [Flow].
+ *   If the owner updates the shop name, all customers see the change instantly.
+ * - **Error Handling:** Wraps Firestore exceptions into our custom [Result] type.
+ * - **Dispatcher Safety:** Ensures heavy mapping operations run on the IO thread.
+ */
 class BusinessProfileRepositoryImpl @Inject constructor(
     private val remoteDataSource: BusinessProfileRemoteDataSource,
-    private val firestore: FirebaseFirestore,
+    private val firestore: FirebaseFirestore, // Used directly for the snapshot stream
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : BusinessProfileRepository {
+
+    /**
+     * Returns a live stream of the business profile.
+     *
+     * It listens to the document in real-time. If the document doesn't exist (yet),
+     * it emits `Success(null)` so the UI can show a default state instead of an error.
+     */
     override fun getBusinessProfile(ownerUserId: String): Flow<Result<BusinessProfile?>> {
-        Timber.d("Repository: Requesting business profile snapshots for ownerUserId: $ownerUserId")
+        Timber.d("Repository: Requesting live profile updates for ownerId: $ownerUserId")
+
         return firestore.collection(FirebaseConstants.BUSINESSES_COLLECTION)
             .document(ownerUserId)
             .snapshots()
@@ -34,45 +52,44 @@ class BusinessProfileRepositoryImpl @Inject constructor(
                     try {
                         val profile = documentSnapshot.toObject(BusinessProfile::class.java)
                         if (profile != null) {
-                            Timber.d("Repository: Profile found and mapped for $ownerUserId: $profile")
+                            // Timber.d("Repository: Profile update received: ${profile.businessName}")
                             Result.Success(profile)
                         } else {
-                            Timber.w("Repository: Profile document exists but toObject returned null for $ownerUserId")
+                            Timber.w("Repository: Document exists but parsing returned null.")
                             Result.Error(
-                                Exception("Failed to parse business profile data from Firestore."),
-                                "Could not read profile information."
+                                Exception("Data Parsing Error"),
+                                "Failed to read profile details."
                             )
                         }
                     } catch (e: Exception) {
-                        Timber.e(e, "Repository: Error parsing business profile for $ownerUserId during map")
-                        Result.Error(
-                            Exception("Error parsing business profile: ${e.localizedMessage}", e),
-                            "An error occurred while reading profile data."
-                        )
+                        Timber.e(e, "Repository: Exception during profile mapping.")
+                        Result.Error(e, "An error occurred while processing data.")
                     }
                 } else {
-                    Timber.d("Repository: No business profile document found for $ownerUserId")
+                    Timber.i("Repository: No profile document found (New Business).")
                     Result.Success(null)
                 }
             }
             .catch { exception ->
-                Timber.e(exception, "Repository: Error in getBusinessProfile snapshots flow for $ownerUserId")
+                Timber.e(exception, "Repository: Stream interruption.")
                 emit(Result.Error(
-                    Exception("Failed to get business profile updates: ${exception.localizedMessage}", exception),
+                    Exception("Stream Error", exception),
                     "Could not fetch profile updates."
                 ))
             }
             .flowOn(ioDispatcher)
     }
 
+    /**
+     * Delegates the update operation to the RemoteDataSource.
+     */
     override suspend fun updateBusinessProfile(
         ownerUserId: String,
         profile: BusinessProfile
     ): Result<Unit> {
-        Timber.d("Repository: Attempting to update business profile for ownerUserId: $ownerUserId")
+        Timber.d("Repository: Updating profile...")
         return withContext(ioDispatcher) {
             remoteDataSource.updateBusinessProfile(ownerUserId, profile)
         }
     }
-
 }

@@ -6,9 +6,9 @@ import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
 /**
- * Firestore'daki 'bookedSlots' koleksiyonundaki belgeleri temsil eder.
- * Sadece müsait saat hesaplaması için gerekli olan zaman bilgilerini içerir.
- * Hassas müşteri bilgisi içermez.
+ * Represents documents in the 'bookedSlots' collection in Firestore.
+ * Contains only the time information required for calculating available slots.
+ * Does not contain sensitive customer data.
  */
 data class BookedSlot(
     val id: String = "",
@@ -20,10 +20,10 @@ data class BookedSlot(
     val appointmentId: String = "",
 
     @get:PropertyName("startTime")
-    val startTime: Timestamp = Timestamp.now(), // Randevunun başlangıç zamanı
+    val startTime: Timestamp = Timestamp.now(),
 
     @get:PropertyName("endTime") @set:PropertyName("endTime")
-    var endTime: Timestamp = Timestamp.now(), // Randevunun bitiş zamanı
+    var endTime: Timestamp = Timestamp.now(),
 
     @ServerTimestamp
     @get:PropertyName("createdAt")

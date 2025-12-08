@@ -22,10 +22,20 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * Manages the UI state for the **Business Owner Registration** screen.
+ *
+ * **Responsibilities:**
+ * - **Input Validation:** Ensures email format, password strength, and matching confirmation.
+ * - **Role Assignment:** Explicitly registers the user with the **"owner"** role via [SignUpUseCase].
+ * - **Navigation:** Upon success, directs the user to the Owner Dashboard ([ScreenRoutes.Schedule]).
+ * - **Error Handling:** Provides specific feedback for common registration errors (e.g., Email already in use).
+ */
 @HiltViewModel
 class OwnerSignUpViewModel @Inject constructor(
     private val signUpUseCase: SignUpUseCase
 ): ViewModel() {
+
     private val _uiState = MutableStateFlow(SignUpUiState())
     val uiState: StateFlow<SignUpUiState> = _uiState.asStateFlow()
 
@@ -58,6 +68,8 @@ class OwnerSignUpViewModel @Inject constructor(
 
     private fun validateInput(state: SignUpUiState): Boolean {
         var isValid = true
+
+        // 1. Email Validation
         val newEmailError: Int? = if (state.email.isBlank()) {
             isValid = false
             R.string.error_email_empty
@@ -68,19 +80,21 @@ class OwnerSignUpViewModel @Inject constructor(
             null
         }
 
+        // 2. Password Validation
         val newPasswordError: Int? = if (state.password.isBlank()) {
             isValid = false
             R.string.error_password_empty
-        } else if (!ValidationUtils.isPasswordLengthValid(state.password)) { // Şifre uzunluk validasyonu
+        } else if (!ValidationUtils.isPasswordLengthValid(state.password)) {
             isValid = false
             R.string.error_password_short
         } else {
             null
         }
 
+        // 3. Confirm Password Validation
         val newConfirmPasswordError: Int? = if (state.confirmPassword.isBlank()) {
             isValid = false
-            R.string.error_confirm_password_empty // Ayrı bir string kaynağı kullanmak daha iyi olabilir
+            R.string.error_password_empty // Reusing password empty error
         } else if (state.password != state.confirmPassword) {
             isValid = false
             R.string.error_password_mismatch
@@ -88,7 +102,7 @@ class OwnerSignUpViewModel @Inject constructor(
             null
         }
 
-        // Sadece state değiştiyse güncelleme yapalım
+        // Only update state if errors have changed (Optimization)
         if (newEmailError != state.emailErrorRes ||
             newPasswordError != state.passwordErrorRes ||
             newConfirmPasswordError != state.confirmPasswordErrorRes) {
@@ -107,30 +121,29 @@ class OwnerSignUpViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, generalErrorRes = null) }
 
         viewModelScope.launch {
-            Timber.d("Attempting sign up for email: $email as an OWNER")
-            // SignUpUseCase'in `suspend operator fun invoke(...): Result<AuthUser>` döndürdüğünü varsayıyoruz.
+            Timber.d("Starting owner registration for: $email")
+
+            // Explicitly passing role = "owner"
             when (val result = signUpUseCase(email, password, role = "owner")) {
                 is Result.Success -> {
-                    // Başarılı kayıt, result.data AuthUser nesnesini içerir.
-                    Timber.i("Owner sign up successful for user: ${result.data.uid} - ${result.data.email}")
+                    Timber.i("Owner registered successfully: ${result.data.uid}")
                     _uiState.update { it.copy(isLoading = false) }
+                    // Navigate to Dashboard/Schedule
                     _eventFlow.emit(SignUpViewEvent.NavigateTo(route = ScreenRoutes.Schedule.route))
                 }
                 is Result.Error -> {
-                    // Hatalı kayıt, result.exception ve result.message kullanılabilir
-                    Timber.w(result.exception, "Sign up failed for email: $email. Message: ${result.message}")
+                    Timber.w(result.exception, "Owner registration failed.")
                     val errorRes = when (result.exception) {
                         is FirebaseNetworkException -> R.string.error_network_connection
-                        is FirebaseAuthUserCollisionException -> R.string.error_auth_email_collision // E-posta zaten kullanımda
-                        is FirebaseAuthWeakPasswordException -> R.string.error_auth_weak_password // Zayıf şifre
-                        is IllegalArgumentException -> R.string.error_auth_generic_signup // Validasyon hatası UseCase'den geliyorsa
-                        else -> R.string.error_signup_failed // Diğer genel hatalar
+                        is FirebaseAuthUserCollisionException -> R.string.error_auth_email_collision
+                        is FirebaseAuthWeakPasswordException -> R.string.error_auth_weak_password
+                        is IllegalArgumentException -> R.string.error_auth_generic_signup
+                        else -> R.string.error_signup_failed
                     }
                     _uiState.update { it.copy(isLoading = false, generalErrorRes = errorRes) }
                 }
                 is Result.Loading -> {
-                    // Bu case'in `suspend fun` bir UseCase için çalışması beklenmez.
-                    Timber.d("SignUpUseCase returned Loading state (unexpected for a direct suspend function result).")
+                    // Should not happen for this UseCase
                 }
             }
         }

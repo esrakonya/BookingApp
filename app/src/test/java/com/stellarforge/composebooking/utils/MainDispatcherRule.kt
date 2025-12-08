@@ -1,4 +1,4 @@
-package com.stellarforge.composebooking.utils // Veya uygun bir paket
+package com.stellarforge.composebooking.utils
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -7,14 +7,17 @@ import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
 /**
- * JUnit 4 Rule to set the Main dispatcher for tests.
- * This rule swaps the Main dispatcher with a TestDispatcher for the duration of the test.
+ * A JUnit 4 Rule that swaps the Main dispatcher with a TestDispatcher.
+ *
+ * This is essential for Unit Testing ViewModels or any code that uses `viewModelScope`
+ * or `Dispatchers.Main`, as the Android Main Looper is not available in local unit tests.
  */
 @ExperimentalCoroutinesApi
 class MainDispatcherRule(
-    val testDispatcher: TestDispatcher = StandardTestDispatcher(), // Veya UnconfinedTestDispatcher()
+    val testDispatcher: TestDispatcher = StandardTestDispatcher(),
 ) : TestWatcher() {
-    val testScope = TestScope(testDispatcher) // Kendi TestScope'umuzu oluşturalım
+
+    val testScope = TestScope(testDispatcher)
     val scheduler = testDispatcher.scheduler
 
     override fun starting(description: Description) {

@@ -4,6 +4,14 @@ import com.google.firebase.firestore.PropertyName
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
+/**
+ * Data model representing a Service offered by the business (e.g., Haircut, Manicure).
+ *
+ * This class maps directly to documents in the 'services' Firestore collection.
+ * Key Details:
+ * - **priceInCents:** Monetary values are stored as [Long] (e.g., $10.50 -> 1050) to avoid floating-point precision errors.
+ * - **durationMinutes:** Used by the booking engine to calculate time slot availability.
+ */
 data class Service (
     val id: String = "",
 

@@ -7,15 +7,21 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 /**
- * Belirli bir işletme sahibine ait tüm servisleri (aktif ve pasif)
- * anlık larak dinleyen UseCase
+ * UseCase responsible for retrieving the complete catalog of services for a specific business owner.
+ *
+ * **Purpose:**
+ * Unlike the customer-facing stream, this UseCase fetches **ALL** services (both Active and Inactive).
+ * It is designed for the "Manage Services" (Admin) dashboard, allowing the owner to see, edit,
+ * or delete any service item, regardless of its visibility status.
  */
 class GetOwnerServicesUseCase @Inject constructor(
     private val serviceRepository: ServiceRepository
 ) {
     /**
-     * @param ownerId Servisleri listelenecek işletme sahibinin UID'si.
-     * @return Servis listesini veya hatayı içeren bir Flow.
+     * Executes the retrieval logic via a reactive stream.
+     *
+     * @param ownerId The unique UID of the business owner.
+     * @return A real-time [Flow] emitting the list of services or an error.
      */
     operator fun invoke(ownerId: String): Flow<Result<List<Service>>> {
         return serviceRepository.getOwnerServicesStream(ownerId)

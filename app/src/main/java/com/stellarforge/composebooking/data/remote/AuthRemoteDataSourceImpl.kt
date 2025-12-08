@@ -10,13 +10,30 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 
+/**
+ * Concrete implementation of [AuthRemoteDataSource] using Firebase SDKs.
+ *
+ * **Key Architectural Pattern: Hybrid Authentication**
+ *
+ * Firebase Authentication handles the secure credential management (Email/Password),
+ * but it doesn't natively store custom application data like "User Role" (Owner vs Customer)
+ * in a way that is easily queryable or editable.
+ *
+ * Therefore, this class orchestrates a synchronized flow:
+ * 1. **Identity:** Managed by [FirebaseAuth] (UID, Email).
+ * 2. **Role & Profile:** Stored in [FirebaseFirestore] under the 'users' collection.
+ *
+ * Every time a user logs in or is checked, we fetch their ID from Auth and their Role from Firestore.
+ */
 class AuthRemoteDataSourceImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore
 ) : AuthRemoteDataSource {
+
     override suspend fun getCurrentUser(): Result<AuthUser?> {
         return try {
             val firebaseUser: FirebaseUser? = firebaseAuth.currentUser
+            // If user is logged in, verify role from Firestore
             val authUser: AuthUser? = firebaseUser?.let { convertFirebaseUserToAuthUser(it) }
             Result.Success(authUser)
         } catch (e: Exception) {
@@ -32,12 +49,13 @@ class AuthRemoteDataSourceImpl @Inject constructor(
             val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = authResult.user
             if (firebaseUser != null) {
+                // Fetch the role immediately after sign in
                 Result.Success(convertFirebaseUserToAuthUser(firebaseUser))
             } else {
                 Result.Error(Exception("Firebase Authentication returned null user after successful sign in."))
             }
         } catch (e: CancellationException) {
-            throw  e
+            throw e
         } catch (e: Exception) {
             Result.Error(e)
         }
@@ -49,9 +67,12 @@ class AuthRemoteDataSourceImpl @Inject constructor(
         role: String
     ): Result<AuthUser> {
         return try {
+            // 1. Create User in Firebase Auth
             val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
             val firebaseUser = authResult.user
+
             if (firebaseUser != null) {
+                // 2. Create User Document in Firestore with the Role
                 val newUserForFirestore = hashMapOf(
                     "email" to firebaseUser.email,
                     "role" to role
@@ -61,6 +82,7 @@ class AuthRemoteDataSourceImpl @Inject constructor(
                     .set(newUserForFirestore)
                     .await()
 
+                // 3. Return Combined Result
                 val authUser = AuthUser(
                     uid = firebaseUser.uid,
                     email = firebaseUser.email,
@@ -89,12 +111,17 @@ class AuthRemoteDataSourceImpl @Inject constructor(
         }
     }
 
+    /**
+     * Bridges the gap between [FirebaseUser] and our domain [AuthUser].
+     * Performs a network call to Firestore to fetch the user's role.
+     */
     private suspend fun convertFirebaseUserToAuthUser(firebaseUser: FirebaseUser): AuthUser {
         val userDocument = firestore.collection(FirebaseConstants.USERS_COLLECTION)
             .document(firebaseUser.uid)
             .get()
             .await()
 
+        // Default to "customer" if role is missing (Safety fallback)
         val role = userDocument.getString("role") ?: "customer"
 
         return AuthUser(
@@ -104,5 +131,4 @@ class AuthRemoteDataSourceImpl @Inject constructor(
             role = role
         )
     }
-
 }

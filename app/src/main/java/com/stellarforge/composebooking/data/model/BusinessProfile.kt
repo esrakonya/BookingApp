@@ -3,11 +3,11 @@ package com.stellarforge.composebooking.data.model
 import com.google.firebase.firestore.PropertyName
 
 /**
- * İşletmenin profil bilgilerini temsil eden data class.
- * Bu bilgiler Firestore'da `/businesses/{ownerUserId}` altında saklanacaktır.
+ * Data class representing the business profile information.
+ * This information will be stored in Firestore under `/businesses/{ownerUserId}`.
  */
 data class BusinessProfile(
-    @get:PropertyName("business_name") // Firestore'daki alan adı (snake_case önerilir)
+    @get:PropertyName("business_name")
     @set:PropertyName("business_name")
     var businessName: String = "",
 
@@ -27,7 +27,6 @@ data class BusinessProfile(
     @set:PropertyName("logo_url")
     var logoUrl: String? = null,
 
-    // Oluşturulma/güncellenme zaman damgaları eklenebilir
     @get:PropertyName("created_at") @set:PropertyName("created_at")
     var createdAt: com.google.firebase.Timestamp? = null,
     @get:PropertyName("updated_at") @set:PropertyName("updated_at")

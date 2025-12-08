@@ -7,19 +7,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.ConnectWithoutContact
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -29,19 +24,31 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
+import com.stellarforge.composebooking.ui.components.AppSnackbarHost
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+/**
+ * Screen for Business Owners to manage their public-facing profile (Storefront).
+ *
+ * **Features:**
+ * - Form inputs for Business Name, Contact Info, Address, and Logo.
+ * - Auto-loading of existing profile data.
+ * - Validation and Save functionality.
+ * - Sign Out option.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BusinessProfileScreen(
     navController: NavController,
     viewModel: BusinessProfileViewModel = hiltViewModel()
 ) {
-    // ViewModel'dan state'leri ve form alanlarını al
+    // Collect State
     val uiState by viewModel.uiState.collectAsState()
+
+    // Form Fields (Two-way binding via ViewModel StateFlows)
     val businessName by viewModel.businessName.collectAsState()
     val contactEmail by viewModel.contactEmail.collectAsState()
     val contactPhone by viewModel.contactPhone.collectAsState()
@@ -50,24 +57,41 @@ fun BusinessProfileScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Dialog State
     var showSignOutDialog by remember { mutableStateOf(false) }
 
+    // Handle One-time Events (Navigation)
     LaunchedEffect(key1 = true) {
         viewModel.eventFlow.collectLatest { event ->
             when (event) {
                 BusinessProfileEvent.NavigateToLogin -> {
                     navController.navigate(ScreenRoutes.Login.route) {
-                        popUpTo(0)
+                        popUpTo(0) // Clear back stack on logout
                     }
                 }
             }
         }
     }
 
-    LaunchedEffect(uiState.updateSuccessMessage, uiState.updateErrorMessage, uiState.loadErrorMessage) {
-        val message = uiState.updateSuccessMessage ?: uiState.updateErrorMessage ?: uiState.loadErrorMessage
-        if (message != null) {
-            scope.launch { snackbarHostState.showSnackbar(message) }
+    // Handle Feedback Messages (Success / Error)
+    // We listen for any non-null resource ID in the state
+    LaunchedEffect(uiState.updateSuccessResId, uiState.updateErrorResId, uiState.loadErrorResId) {
+        // Prioritize messages: Success > Update Error > Load Error
+        val messageResId = uiState.updateSuccessResId ?: uiState.updateErrorResId ?: uiState.loadErrorResId
+
+        if (messageResId != null) {
+            val isError = uiState.updateErrorResId != null || uiState.loadErrorResId != null
+            val type = if (isError) "error" else "success"
+
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    message = context.getString(messageResId),
+                    actionLabel = type, // Trigger Red/Green color in AppSnackbar
+                    duration = SnackbarDuration.Short
+                )
+            }
             viewModel.clearUpdateMessages()
         }
     }
@@ -86,7 +110,9 @@ fun BusinessProfileScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // CUSTOM SNACKBAR
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+
         bottomBar = {
             AppBottomNavigationBar(
                 navController = navController,
@@ -97,23 +123,22 @@ fun BusinessProfileScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Scaffold'un padding'ini uygula
+                .padding(paddingValues)
         ) {
-            // Sadece ilk yüklemede tam ekran loading göster,
-            // arka planda tazeleme sırasında içeriği gizleme.
+            // Show full-screen loading only on initial load (if no data yet)
             if (uiState.isLoadingProfile && uiState.profileData == null) {
                 LoadingIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
-                // Ana içerik Column'u, kaydırılabilir ve boşluklu
+                // Content
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
-                        .imePadding(),
-                    verticalArrangement = Arrangement.spacedBy(24.dp) // Kartlar arası dikey boşluk
+                        .imePadding(), // Adjust for keyboard
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    // Temel Bilgiler Kartı
+                    // 1. Basic Info
                     SectionCard(
                         title = stringResource(R.string.header_basic_info),
                         icon = Icons.Default.Business
@@ -125,7 +150,7 @@ fun BusinessProfileScreen(
                             label = { Text(stringResource(R.string.label_business_name_required)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
-                            // TODO: ViewModel'dan gelen validasyon sonucuna göre isError ve supportingText ekle
+                            isError = uiState.updateErrorResId == R.string.label_business_name_required // Simple validation highlight
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         OutlinedTextField(
@@ -142,7 +167,7 @@ fun BusinessProfileScreen(
                         )
                     }
 
-                    // İletişim Bilgileri Kartı
+                    // 2. Contact Info
                     SectionCard(
                         title = stringResource(R.string.header_contact_info),
                         icon = Icons.Default.ConnectWithoutContact
@@ -174,7 +199,7 @@ fun BusinessProfileScreen(
                         )
                     }
 
-                    // Konum Bilgileri Kartı
+                    // 3. Location Info
                     SectionCard(
                         title = stringResource(R.string.header_location_info),
                         icon = Icons.Default.LocationOn
@@ -189,12 +214,46 @@ fun BusinessProfileScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(80.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // 4. Save Button
+                    Button(
+                        onClick = { viewModel.saveBusinessProfile() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        enabled = !uiState.isUpdatingProfile, // Disable while saving
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        if (uiState.isUpdatingProfile) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(stringResource(R.string.loading)) // "Loading..."
+                        } else {
+                            Icon(Icons.Default.Save, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.action_save_changes),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }
     }
 
+    // Sign Out Confirmation Dialog
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
@@ -220,8 +279,7 @@ fun BusinessProfileScreen(
 }
 
 /**
- * Form bölümlerini sarmalamak için yeniden kullanılabilir bir Card bileşeni.
- * Başlık ve ikon ile görsel hiyerarşi sağlar.
+ * Reusable Card wrapper for form sections.
  */
 @Composable
 fun SectionCard(
@@ -251,10 +309,9 @@ fun SectionCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold // SemiBold daha yumuşak bir vurgu sağlar
+                    fontWeight = FontWeight.SemiBold
                 )
             }
-            // Kartın içeriği (TextField'lar vb.) bu ColumnScope içinde render edilir.
             content()
         }
     }

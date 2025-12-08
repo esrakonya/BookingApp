@@ -1,6 +1,5 @@
 package com.stellarforge.composebooking.ui.screens.booking
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -35,8 +34,9 @@ import com.kizitonwose.calendar.core.DayPosition
 import com.kizitonwose.calendar.core.daysOfWeek
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Service
+import com.stellarforge.composebooking.ui.components.AppSnackbarHost
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
-import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation // Bu import'un doğru olduğundan emin ol
+import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation
 import com.stellarforge.composebooking.utils.toFormattedPrice
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -47,6 +47,16 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * The primary screen for the Customer Booking Flow.
+ *
+ * **Features:**
+ * - **Service Details:** Displays the summary of the selected service.
+ * - **Calendar:** Interactive horizontal calendar for date selection.
+ * - **Slot Selection:** Dynamic time slots based on availability logic.
+ * - **Customer Info:** Form to capture user details (Name, Phone, Email).
+ * - **Confirmation:** Triggers the booking transaction.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BookingScreen(
@@ -57,7 +67,9 @@ fun BookingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
+    // Handle One-time Events (Navigation & Errors)
     LaunchedEffect(key1 = viewModel.eventFlow) {
         viewModel.eventFlow.collectLatest { event ->
             when (event) {
@@ -65,9 +77,11 @@ fun BookingScreen(
                     onBookingConfirmed()
                 }
                 is BookingViewEvent.ShowSnackbar -> {
-                    launch {
+                    scope.launch {
+                        // Use "error" action label to trigger the Red/Error styling in AppSnackbar
                         snackbarHostState.showSnackbar(
                             message = context.getString(event.messageId),
+                            actionLabel = "error",
                             duration = SnackbarDuration.Short
                         )
                     }
@@ -80,9 +94,9 @@ fun BookingScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    // DÜZELTİLDİ: Artık uiState.service nesnesinden okunuyor.
                     Text(
-                        text = uiState.service?.name ?: stringResource(id = R.string.booking_screen_title_default),
+                        text = uiState.service?.let { stringResource(R.string.booking_screen_title_with_service, it.name) }
+                            ?: stringResource(id = R.string.booking_screen_title),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -97,10 +111,15 @@ fun BookingScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        // CUSTOM SNACKBAR HOST
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+
         bottomBar = {
-            // DÜZELTİLDİ: Butonun 'enabled' durumu yeni UiState'e göre ayarlandı.
-            val isFormValid = uiState.customerName.isNotBlank() && uiState.customerPhone.isNotBlank() && uiState.nameError == null && uiState.phoneError == null
+            val isFormValid = uiState.customerName.isNotBlank() &&
+                    uiState.customerPhone.isNotBlank() &&
+                    uiState.nameError == null &&
+                    uiState.phoneError == null
+
             Surface(tonalElevation = 4.dp, shadowElevation = 4.dp) {
                 Button(
                     onClick = viewModel::confirmBooking,
@@ -108,7 +127,7 @@ fun BookingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(52.dp)
+                        .height(56.dp) // Standard touch target height
                 ) {
                     if (uiState.isBooking) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
@@ -122,7 +141,7 @@ fun BookingScreen(
             }
         }
     ) { paddingValues ->
-        // DÜZELTİLDİ: Yükleme durumu kontrolü `service` nesnesinin null olup olmadığına bakıyor.
+        // Main Content Area
         if (uiState.isLoadingService && uiState.service == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 LoadingIndicator()
@@ -136,33 +155,35 @@ fun BookingScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // `service` null değilse detayları göster
                 uiState.service?.let { service ->
                     ServiceDetailsSection(service = service)
                 }
+
                 DateTimeSelectionSection(
                     uiState = uiState,
                     onDateSelected = viewModel::onDateSelected,
                     onSlotSelected = viewModel::onSlotSelected
                 )
+
                 CustomerInfoSection(
                     uiState = uiState,
                     onNameChanged = viewModel::onCustomerNameChanged,
                     onPhoneChanged = viewModel::onCustomerPhoneChanged,
                     onEmailChanged = viewModel::onCustomerEmailChanged
                 )
-                Spacer(modifier = Modifier.height(64.dp)) // Butonun arkasında kalmasın diye
+
+                Spacer(modifier = Modifier.height(64.dp)) // Extra space for bottom bar
             }
         }
     }
 }
 
-//--- YARDIMCI COMPOSABLE BİLEŞENLER ---
+//--- HELPER COMPOSABLES ---
 
 @Composable
-private fun ServiceDetailsSection(service: Service) { // DÜZELTİLDİ: Artık tam bir Service nesnesi alıyor
+private fun ServiceDetailsSection(service: Service) {
     SectionCard(
-        title = stringResource(R.string.booking_screen_section_service_details_title),
+        title = stringResource(R.string.booking_screen_section_service_details),
         icon = Icons.Default.ContentCut
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -172,10 +193,16 @@ private fun ServiceDetailsSection(service: Service) { // DÜZELTİLDİ: Artık t
                 color = MaterialTheme.colorScheme.primary
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                DetailItem(label = stringResource(id = R.string.booking_screen_duration_label), value = stringResource(id = R.string.booking_screen_duration_value, service.durationMinutes))
+                DetailItem(
+                    label = stringResource(id = R.string.booking_screen_duration_label),
+                    value = stringResource(id = R.string.service_list_item_duration, service.durationMinutes)
+                )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                DetailItem(label = stringResource(id = R.string.booking_screen_price_label), value = service.priceInCents.toFormattedPrice())
+                DetailItem(
+                    label = stringResource(id = R.string.booking_screen_price_label),
+                    value = service.priceInCents.toFormattedPrice()
+                )
             }
         }
     }
@@ -183,16 +210,18 @@ private fun ServiceDetailsSection(service: Service) { // DÜZELTİLDİ: Artık t
 
 @Composable
 private fun DetailItem(label: String, value: String) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Text(
-        text = value,
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.Bold
-    )
+    Row {
+        Text(
+            text = "$label: ",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -203,9 +232,10 @@ private fun DateTimeSelectionSection(
     onSlotSelected: (LocalTime) -> Unit
 ) {
     SectionCard(
-        title = stringResource(R.string.booking_screen_section_datetime_title),
+        title = stringResource(R.string.booking_screen_section_datetime),
         icon = Icons.Default.CalendarToday
     ) {
+        // Calendar Logic
         val currentMonth = remember { YearMonth.now() }
         val startMonth = remember { currentMonth }
         val endMonth = remember { currentMonth.plusMonths(3) }
@@ -217,12 +247,15 @@ private fun DateTimeSelectionSection(
             firstDayOfWeek = daysOfWeek.first()
         )
         val visibleMonth = remember { derivedStateOf { calendarState.firstVisibleMonth } }.value
+
         Text(
             text = "${visibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.titlecase(Locale.getDefault()) }} ${visibleMonth.yearMonth.year}",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(bottom = 10.dp)
         )
+
+        // Week Headers
         Row(modifier = Modifier.fillMaxWidth()) {
             daysOfWeek.forEach { dayOfWeek ->
                 Text(
@@ -234,6 +267,8 @@ private fun DateTimeSelectionSection(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
+
+        // Calendar Grid
         HorizontalCalendar(
             state = calendarState,
             dayContent = { day ->
@@ -248,17 +283,27 @@ private fun DateTimeSelectionSection(
                 )
             }
         )
+
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+        // Time Slot Selection Grid
         if (uiState.isLoadingSlots) {
-            LoadingSection(text = stringResource(R.string.booking_screen_loading_slots))
+            LoadingSection(text = stringResource(R.string.loading))
         } else if (uiState.error != null && uiState.availableSlots.isEmpty()) {
             Text(
-                stringResource(id = uiState.error),
+                stringResource(id = uiState.error!!),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
+            Text(
+                text = stringResource(R.string.booking_screen_select_time_label),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -278,6 +323,7 @@ private fun DateTimeSelectionSection(
     }
 }
 
+
 @Composable
 private fun CustomerInfoSection(
     uiState: BookingUiState,
@@ -286,7 +332,7 @@ private fun CustomerInfoSection(
     onEmailChanged: (String) -> Unit
 ) {
     SectionCard(
-        title = stringResource(R.string.booking_screen_section_customer_info_title),
+        title = stringResource(R.string.booking_screen_section_customer_info),
         icon = Icons.Default.Person
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -296,7 +342,7 @@ private fun CustomerInfoSection(
                 label = { Text(stringResource(id = R.string.booking_screen_name_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                isError = uiState.nameError != null, // DÜZELTİLDİ: nameErrorRes yerine nameError
+                isError = uiState.nameError != null,
                 supportingText = { uiState.nameError?.let { Text(stringResource(id = it)) } },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
@@ -307,7 +353,7 @@ private fun CustomerInfoSection(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
-                isError = uiState.phoneError != null, // DÜZELTİLDİ: phoneErrorRes yerine phoneError
+                isError = uiState.phoneError != null,
                 supportingText = { uiState.phoneError?.let { Text(stringResource(id = it)) } },
                 visualTransformation = PhoneNumberVisualTransformation()
             )
@@ -324,6 +370,9 @@ private fun CustomerInfoSection(
     }
 }
 
+/**
+ * Reusable Card component for grouping related booking information.
+ */
 @Composable
 private fun SectionCard(
     title: String,

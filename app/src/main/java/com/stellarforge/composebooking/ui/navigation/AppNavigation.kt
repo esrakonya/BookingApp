@@ -1,14 +1,8 @@
 package com.stellarforge.composebooking.ui.navigation
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -25,39 +19,31 @@ import com.stellarforge.composebooking.ui.screens.booking.BookingScreen
 import com.stellarforge.composebooking.ui.screens.businessprofile.BusinessProfileScreen
 import com.stellarforge.composebooking.ui.screens.manageservices.ManageServicesScreen
 import com.stellarforge.composebooking.ui.screens.mybookings.MyBookingsScreen
-import com.stellarforge.composebooking.ui.screens.profile.ProfileEvent
-import com.stellarforge.composebooking.ui.screens.profile.ProfileScreen
-import com.stellarforge.composebooking.ui.screens.profile.ProfileViewModel
+import com.stellarforge.composebooking.ui.screens.customerprofile.CustomerProfileEvent
+import com.stellarforge.composebooking.ui.screens.customerprofile.CustomerProfileScreen
+import com.stellarforge.composebooking.ui.screens.customerprofile.CustomerProfileViewModel
 import com.stellarforge.composebooking.ui.screens.schedule.ScheduleScreen
 import com.stellarforge.composebooking.ui.screens.splash.SplashScreen
-import com.stellarforge.composebooking.ui.screens.splash.SplashViewModel
 import kotlinx.coroutines.flow.collectLatest
-import timber.log.Timber
 
+/**
+ * Main Navigation Graph for the application.
+ * Handles routing between all screens (Customer, Owner, Auth, etc.).
+ */
 @Composable
 fun AppNavigation(navController: NavHostController) {
     NavHost(
         navController = navController,
         startDestination = ScreenRoutes.Splash.route
     ) {
+        // --- Splash Screen ---
         composable(route = ScreenRoutes.Splash.route) {
-            val viewModel: SplashViewModel = hiltViewModel()
-            val startDestination by viewModel.startDestination.collectAsState()
-
-            LaunchedEffect(startDestination) {
-                Timber.d("Splash LaunchedEffect triggered with startDestination: $startDestination")
-                startDestination?.let { destination ->
-                    navController.navigate(destination) {
-                        popUpTo(ScreenRoutes.Splash.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            }
-
-            SplashScreen()
+            SplashScreen(
+                navController = navController
+            )
         }
 
-        // Müşteri Auth Ekranları
+        // --- Customer Authentication Screens ---
         composable(route = ScreenRoutes.Login.route) {
             LoginScreen(
                 navController = navController
@@ -70,7 +56,7 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
-        // İşletme Sahibi Ekranları
+        // --- Business Owner Authentication Screens ---
         composable(route = ScreenRoutes.OwnerLogin.route) {
             OwnerLoginScreen(
                 navController = navController
@@ -83,26 +69,28 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
-        // Müşteri Ana Ekranları
+        // --- Customer Main Screens ---
+
+        // Service List (Home Screen for Customers)
         composable(route = ScreenRoutes.ServiceList.route) {
-            // Bu rota çağrıldığında ServiceListScreen Composable'ını göster
             ServiceListScreen(
-                // ViewModel zaten Hilt tarafından sağlanacak (Composable içinde)
                 navController = navController,
                 onServiceClick = { serviceId ->
-                    // Rezervasyon ekranına git
+                    // Navigate to Booking Screen with the selected Service ID
                     navController.navigate(ScreenRoutes.BookingScreen.createRoute(serviceId))
                 }
             )
         }
 
+        // Booking Detail Screen
         composable(
-            route = ScreenRoutes.BookingScreen.route, // "booking_screen/{serviceId}"
-            arguments = listOf(navArgument("serviceId") { type = NavType.StringType }) // Argümanı tanımla
+            route = ScreenRoutes.BookingScreen.route, // Route: "booking_screen/{serviceId}"
+            arguments = listOf(navArgument("serviceId") { type = NavType.StringType })
         ) { backStackEntry ->
             BookingScreen(
                 navController = navController,
                 onBookingConfirmed = {
+                    // Navigate to confirmation page and clear back stack to prevent going back to booking form
                     navController.navigate(ScreenRoutes.BookingConfirmation.route) {
                         popUpTo(backStackEntry.destination.id) {
                             inclusive = true
@@ -113,75 +101,69 @@ fun AppNavigation(navController: NavHostController) {
             )
         }
 
+        // Booking Success/Confirmation Screen
         composable(route = ScreenRoutes.BookingConfirmation.route) {
-            // BookingConfirmationScreen Composable'ını göster
             BookingConfirmationScreen(
                 onNavigateHome = {
-                    // Ana ekrana (ServiceList) dönmek için
-                    // Zaten popUpTo ile ServiceList'e dönmüştük,
-                    // ama kullanıcı tekrar dönebilmeli.
+                    // Return to Home (ServiceList) and clear history
                     navController.navigate(ScreenRoutes.ServiceList.route) {
-                        popUpTo(ScreenRoutes.ServiceList.route) { inclusive = true } // ServiceList dahil hepsini temizle
+                        popUpTo(ScreenRoutes.ServiceList.route) { inclusive = true }
                         launchSingleTop = true
                     }
                 }
             )
         }
 
-        // İşletme Sahibi Ana Ekranları
+        // --- Business Owner Main Screens ---
+
+        // Business Profile (Dashboard)
         composable(route = ScreenRoutes.BusinessProfile.route) {
             BusinessProfileScreen(navController = navController)
         }
 
+        // Manage Services (List of services offered by the owner)
         composable(route = ScreenRoutes.ManageServices.route) {
             ManageServicesScreen(
                 navController = navController,
                 onAddService = {
+                    // Navigate to Add/Edit screen with null ID (Create Mode)
                     navController.navigate(ScreenRoutes.AddEditService.createRoute(serviceId = null))
                 },
                 onEditService = { serviceId ->
+                    // Navigate to Add/Edit screen with existing ID (Edit Mode)
                     navController.navigate(ScreenRoutes.AddEditService.createRoute(serviceId = serviceId))
                 }
             )
         }
 
+        // Add or Edit Service Screen
         composable(
             route = ScreenRoutes.AddEditService.route,
             arguments = listOf(
                 navArgument("serviceId") {
                     type = NavType.StringType
-                    nullable = true
+                    nullable = true // Nullable allows using the same screen for 'Add' and 'Edit'
                 }
             )
         ) {
             AddEditServiceScreen(navController = navController)
         }
 
+        // --- Shared / Profile Screens ---
+
+        // Customer Booking History
         composable(ScreenRoutes.MyBookings.route) {
             MyBookingsScreen(navController = navController)
         }
 
+        // Owner Schedule View
         composable(ScreenRoutes.Schedule.route) {
             ScheduleScreen(navController = navController)
         }
 
-        composable(ScreenRoutes.Profile.route) {
-            val viewModel: ProfileViewModel = hiltViewModel()
-
-            LaunchedEffect(key1 = true) {
-                viewModel.eventFlow.collectLatest { event ->
-                    when(event) {
-                        ProfileEvent.NavigateToLogin -> {
-                            navController.navigate(ScreenRoutes.Login.route) {
-                                popUpTo(0)
-                            }
-                        }
-                    }
-                }
-            }
-            ProfileScreen(navController = navController, viewModel = viewModel)
+        // Customer Profile & Settings
+        composable(ScreenRoutes.CustomerProfile.route) {
+            CustomerProfileScreen(navController = navController)
         }
-
-
     }
 }

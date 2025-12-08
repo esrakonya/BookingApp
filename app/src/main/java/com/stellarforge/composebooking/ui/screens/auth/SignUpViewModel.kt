@@ -1,17 +1,15 @@
-package com.stellarforge.composebooking.ui.screens.auth // Kendi paket adını kontrol et
+package com.stellarforge.composebooking.ui.screens.auth
 
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// Firebase Exception importları
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.stellarforge.composebooking.R
-import com.stellarforge.composebooking.data.model.AuthUser // AuthUser importu
 import com.stellarforge.composebooking.domain.usecase.SignUpUseCase
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
-import com.stellarforge.composebooking.utils.Result // KENDİ Result.kt dosyanın importu
+import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.utils.ValidationUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -41,9 +39,18 @@ sealed interface SignUpViewEvent {
     data class ShowSnackbar(@StringRes val messageResId: Int) : SignUpViewEvent
 }
 
+/**
+ * Manages the UI state for the **Customer Registration** screen.
+ *
+ * **Responsibilities:**
+ * - Handles user input for Email, Password, and Password Confirmation.
+ * - **Role Assignment:** Automatically registers the user with the **"customer"** role via [SignUpUseCase].
+ * - **Navigation:** Upon success, directs the user to the Customer Home Screen ([ScreenRoutes.ServiceList]).
+ * - **Validation:** Ensures data integrity before making network calls.
+ */
 @HiltViewModel
 class SignUpViewModel @Inject constructor(
-    private val signUpUseCase: SignUpUseCase // SignUpUseCase'in Result<AuthUser> döndürdüğünü varsayıyoruz
+    private val signUpUseCase: SignUpUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SignUpUiState())
@@ -66,8 +73,9 @@ class SignUpViewModel @Inject constructor(
 
     fun onSignUpClick() {
         val currentState = _uiState.value
+        // Prevent multiple clicks while loading
         if (currentState.isLoading) {
-            Timber.d("Sign up attempt while already loading. Ignoring.")
+            Timber.d("Sign up attempt while loading. Ignored.")
             return
         }
 
@@ -78,6 +86,8 @@ class SignUpViewModel @Inject constructor(
 
     private fun validateInput(state: SignUpUiState): Boolean {
         var isValid = true
+
+        // 1. Email Validation
         val newEmailError: Int? = if (state.email.isBlank()) {
             isValid = false
             R.string.error_email_empty
@@ -88,19 +98,21 @@ class SignUpViewModel @Inject constructor(
             null
         }
 
+        // 2. Password Validation
         val newPasswordError: Int? = if (state.password.isBlank()) {
             isValid = false
             R.string.error_password_empty
-        } else if (!ValidationUtils.isPasswordLengthValid(state.password)) { // Şifre uzunluk validasyonu
+        } else if (!ValidationUtils.isPasswordLengthValid(state.password)) {
             isValid = false
             R.string.error_password_short
         } else {
             null
         }
 
+        // 3. Confirm Password Validation
         val newConfirmPasswordError: Int? = if (state.confirmPassword.isBlank()) {
             isValid = false
-            R.string.error_confirm_password_empty // Ayrı bir string kaynağı kullanmak daha iyi olabilir
+            R.string.error_password_empty // Reuse password empty string
         } else if (state.password != state.confirmPassword) {
             isValid = false
             R.string.error_password_mismatch
@@ -108,7 +120,7 @@ class SignUpViewModel @Inject constructor(
             null
         }
 
-        // Sadece state değiştiyse güncelleme yapalım
+        // Update state only if errors changed
         if (newEmailError != state.emailErrorRes ||
             newPasswordError != state.passwordErrorRes ||
             newConfirmPasswordError != state.confirmPasswordErrorRes) {
@@ -127,30 +139,29 @@ class SignUpViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, generalErrorRes = null) }
 
         viewModelScope.launch {
-            Timber.d("Attempting sign up for email: $email")
-            // SignUpUseCase'in `suspend operator fun invoke(...): Result<AuthUser>` döndürdüğünü varsayıyoruz.
+            Timber.d("Attempting Customer sign up for: $email")
+
+            // Explicitly pass role = "customer"
             when (val result = signUpUseCase(email, password, role = "customer")) {
                 is Result.Success -> {
-                    // Başarılı kayıt, result.data AuthUser nesnesini içerir.
-                    Timber.i("Sign up successful for user: ${result.data.uid} - ${result.data.email}")
+                    Timber.i("Customer registered successfully: ${result.data.uid}")
                     _uiState.update { it.copy(isLoading = false) }
+                    // Navigate to Home
                     _eventFlow.emit(SignUpViewEvent.NavigateTo(route = ScreenRoutes.ServiceList.route))
                 }
                 is Result.Error -> {
-                    // Hatalı kayıt, result.exception ve result.message kullanılabilir
-                    Timber.w(result.exception, "Sign up failed for email: $email. Message: ${result.message}")
+                    Timber.w(result.exception, "Sign up failed. Message: ${result.message}")
                     val errorRes = when (result.exception) {
                         is FirebaseNetworkException -> R.string.error_network_connection
-                        is FirebaseAuthUserCollisionException -> R.string.error_auth_email_collision // E-posta zaten kullanımda
-                        is FirebaseAuthWeakPasswordException -> R.string.error_auth_weak_password // Zayıf şifre
-                        is IllegalArgumentException -> R.string.error_auth_generic_signup // Validasyon hatası UseCase'den geliyorsa
-                        else -> R.string.error_signup_failed // Diğer genel hatalar
+                        is FirebaseAuthUserCollisionException -> R.string.error_auth_email_collision // Email already in use
+                        is FirebaseAuthWeakPasswordException -> R.string.error_auth_weak_password // Password too weak
+                        is IllegalArgumentException -> R.string.error_auth_generic_signup // UseCase validation error
+                        else -> R.string.error_signup_failed
                     }
                     _uiState.update { it.copy(isLoading = false, generalErrorRes = errorRes) }
                 }
                 is Result.Loading -> {
-                    // Bu case'in `suspend fun` bir UseCase için çalışması beklenmez.
-                    Timber.d("SignUpUseCase returned Loading state (unexpected for a direct suspend function result).")
+                    // Should not happen
                 }
             }
         }

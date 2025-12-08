@@ -1,43 +1,44 @@
 package com.stellarforge.composebooking.utils
 
 /**
- * Girdi validasyonu için yardımcı fonksiyonları içerir.
+ * Utility object for centralized input validation logic.
+ *
+ * **Purpose:**
+ * Ensures data integrity on the UI layer before it reaches the Domain layer.
+ * Using a singleton object allows these functions to be easily accessed from any ViewModel
+ * or Composable without dependency injection overhead.
  */
-object ValidationUtils { // Fonksiyonları gruplamak için bir object kullanabiliriz
-    // veya direkt top-level fonksiyonlar da olabilir.
-    // object kullanmak, ValidationUtils.isEmailValid gibi çağırmayı sağlar.
+object ValidationUtils {
+
+    // A standard, robust Regex for Email validation.
+    // Allows alphanumeric characters, dots, underscores, and hyphens.
+    // Supports modern top-level domains (e.g., .tech, .design) by not limiting extension length.
+    private const val EMAIL_PATTERN = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$"
 
     /**
-     * Verilen karakter dizisinin geçerli bir e-posta formatında olup olmadığını kontrol eder.
-     * @param email Kontrol edilecek e-posta.
-     * @return E-posta formatı geçerliyse true, değilse false.
+     * Checks if the provided char sequence matches a valid email format.
+     *
+     * @param email The input string to validate.
+     * @return `true` if the email format is valid, `false` otherwise.
      */
     fun isEmailValid(email: CharSequence): Boolean {
         if (email.isBlank()) {
             return false
         }
-        // Genel kabul görmüş bir e-posta regex'i.
-        // İhtiyaçlarınıza göre bu regex'i daha da geliştirebilir veya basitleştirebilirsiniz.
-        val emailRegex = Regex("^[A-Za-z0-9+_.-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,6}$")
-        return emailRegex.matches(email)
+        return Regex(EMAIL_PATTERN).matches(email)
     }
 
     /**
-     * Verilen şifrenin minimum uzunluk kuralını karşılayıp karşılamadığını kontrol eder.
-     * @param password Kontrol edilecek şifre.
-     * @param minLength Gerekli minimum uzunluk (varsayılan 6).
-     * @return Şifre minimum uzunluktaysa veya daha uzunsa true, değilse false.
+     * Checks if the provided password meets the minimum security length requirement.
+     *
+     * @param password The input string to validate.
+     * @param minLength The required minimum length (defaults to 6 characters).
+     * @return `true` if the password length is sufficient, `false` otherwise.
      */
     fun isPasswordLengthValid(password: CharSequence, minLength: Int = 6): Boolean {
         if (password.isBlank()) {
-            return false // Boş şifre genellikle geçersizdir, ama bu kontrol ViewModel'da ayrıca yapılabilir.
-            // Bu fonksiyon sadece uzunluğa odaklanabilir.
+            return false
         }
         return password.length >= minLength
     }
-
-    // Gelecekte başka validasyon fonksiyonları eklenebilir:
-    // fun isPhoneNumberValid(phone: CharSequence): Boolean { ... }
-    // fun doPasswordsMatch(password: CharSequence, confirmPassword: CharSequence): Boolean { ... }
-    // (Şifre eşleşme kontrolü zaten SignUpViewModel'da yapılıyor, burada da olabilirdi)
 }

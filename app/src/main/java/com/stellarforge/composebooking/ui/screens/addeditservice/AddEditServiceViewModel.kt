@@ -1,8 +1,10 @@
 package com.stellarforge.composebooking.ui.screens.addeditservice
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.domain.usecase.AddServiceUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
@@ -15,23 +17,35 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.math.BigDecimal
 import javax.inject.Inject
 
 data class AddEditServiceUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    val serviceSaved: Boolean = false, // Kayıt başarılı olduğunda true olur ve bir önceki ekrana dönülür
-    val screenTitle: String = "Yeni Servis Ekle",
-    val error: String? = null,
+    val serviceSaved: Boolean = false,
 
-    // Form Alanları
+    @StringRes val screenTitle: Int = R.string.add_edit_service_screen_title_add,
+    @StringRes val error: Int? = null,
+
+    // Form Fields
     val name: String = "",
     val description: String = "",
-    val duration: String = "", // Kullanıcıdan String olarak alıp sonra Int'e çevireceğiz
-    val price: String = "",    // Kullanıcıdan String olarak alıp sonra Long'a (kuruş) çevireceğiz
+    val duration: String = "",
+    val price: String = "",
     val isActive: Boolean = true
 )
 
+/**
+ * ViewModel responsible for the "Add New Service" and "Edit Service" screens.
+ *
+ * **Responsibilities:**
+ * - **Mode Detection:** Determines if the screen is in 'Add' or 'Edit' mode based on the `serviceId` navigation argument.
+ * - **Data Loading:** Fetches existing service details if in 'Edit' mode.
+ * - **Input Validation:** Validates Name, Duration, and Price (handling BigDecimal conversion).
+ * - **Persistance:** Calls the appropriate UseCase ([AddServiceUseCase] or [UpdateServiceUseCase]) to save changes.
+ */
 @HiltViewModel
 class AddEditServiceViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -40,7 +54,8 @@ class AddEditServiceViewModel @Inject constructor(
     private val updateServiceUseCase: UpdateServiceUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase
 ) : ViewModel() {
-    private val serviceId: String? =savedStateHandle.get("serviceId")
+
+    private val serviceId: String? = savedStateHandle.get("serviceId")
 
     private val _uiState = MutableStateFlow(AddEditServiceUiState())
     val uiState: StateFlow<AddEditServiceUiState> = _uiState.asStateFlow()
@@ -65,19 +80,23 @@ class AddEditServiceViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                screenTitle = "Servisi Düzenle",
+                                screenTitle = R.string.add_edit_service_screen_title_edit,
                                 name = service.name,
                                 description = service.description,
                                 duration = service.durationMinutes.toString(),
-                                // Kuruşları (Long) tekrar TL String'ine çeviriyoruz (örn: 15050 -> "150.50")
+                                // Convert cents back to formatted string (e.g., 15050 -> "150.5")
                                 price = (service.priceInCents / 100.0).toString(),
                                 isActive = service.isActive
                             )
                         }
-                    } ?: _uiState.update { it.copy(isLoading = false, error = "Servis bulunamadı.") }
+                    } ?: _uiState.update {
+                        it.copy(isLoading = false, error = R.string.error_service_not_found)
+                    }
                 }
                 is Result.Error -> {
-                    _uiState.update { it.copy(isLoading = false, error = result.message ?: "Servis yüklenemedi.") }
+                    _uiState.update {
+                        it.copy(isLoading = false, error = R.string.error_loading_service_details)
+                    }
                 }
                 is Result.Loading -> {}
             }
@@ -92,26 +111,50 @@ class AddEditServiceViewModel @Inject constructor(
 
     fun saveService() {
         viewModelScope.launch {
+            val currentState = _uiState.value
+
+            // Log in English for maintainability
+            Timber.tag("AddEditService").d("Attempting to save service: Name='${currentState.name}', Duration='${currentState.duration}', Price='${currentState.price}'")
+
             val userResult = getCurrentUserUseCase()
             val currentUser = (userResult as? Result.Success)?.data
             if (currentUser == null) {
-                _uiState.update { it.copy(error = "İşlem için kullanıcı doğrulaması gerekli.") }
+                _uiState.update { it.copy(error = R.string.error_auth_user_not_found) }
                 return@launch
             }
 
-            _uiState.update { it.copy(isSaving = true) }
+            _uiState.update { it.copy(isSaving = true, error = null) }
 
-            val currentState = _uiState.value
+            // 1. Validate Name
+            if (currentState.name.isBlank()) {
+                _uiState.update { it.copy(isSaving = false, error = R.string.error_name_empty) }
+                return@launch
+            }
+
+            // 2. Validate Duration
             val durationInt = currentState.duration.toIntOrNull()
-            // Fiyatı kuruşa çeviriyoruz (örn: "150.5" -> 15050L)
-            val priceInCents = currentState.price.replace(',', '.').toDoubleOrNull()?.let { (it * 100).toLong() }
-
-            // Form Validasyonu
-            if (currentState.name.isBlank() || durationInt == null || priceInCents == null) {
-                _uiState.update { it.copy(isSaving = false, error = "Lütfen tüm zorunlu alanları doğru doldurun.") }
+            if (durationInt == null || durationInt <= 0) {
+                _uiState.update { it.copy(isSaving = false, error = R.string.error_booking_generic_problem) }
                 return@launch
             }
 
+            // 3. Validate Price (BigDecimal)
+            val priceInCents = try {
+                val cleanPrice = currentState.price.replace(',', '.').trim()
+                if (cleanPrice.isEmpty()) throw NumberFormatException()
+
+                BigDecimal(cleanPrice).movePointRight(2).toLong()
+            } catch (e: Exception) {
+                Timber.e(e, "Price conversion error for input: ${currentState.price}")
+                null
+            }
+
+            if (priceInCents == null || priceInCents < 0) {
+                _uiState.update { it.copy(isSaving = false, error = R.string.error_booking_generic_problem) }
+                return@launch
+            }
+
+            // 4. Prepare Object
             val serviceToSave = (originalService ?: Service()).copy(
                 ownerId = currentUser.uid,
                 name = currentState.name.trim(),
@@ -121,20 +164,26 @@ class AddEditServiceViewModel @Inject constructor(
                 isActive = currentState.isActive
             )
 
+            // 5. Execute UseCase
             val result = if (serviceId == null) {
-                // Ekleme Modu
                 addServiceUseCase(serviceToSave)
             } else {
-                // Düzenleme Modu
                 updateServiceUseCase(serviceToSave)
             }
 
             when (result) {
                 is Result.Success -> {
+                    Timber.tag("AddEditService").d("Service saved successfully.")
                     _uiState.update { it.copy(isSaving = false, serviceSaved = true) }
                 }
                 is Result.Error -> {
-                    _uiState.update { it.copy(isSaving = false, error = result.message ?: "Servis kaydedilemedi.") }
+                    Timber.tag("AddEditService").e(result.exception, "Save failed: ${result.message}")
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            error = R.string.error_booking_failed
+                        )
+                    }
                 }
                 is Result.Loading -> {}
             }

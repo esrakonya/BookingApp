@@ -5,15 +5,24 @@ import com.stellarforge.composebooking.utils.Result
 import javax.inject.Inject
 
 /**
- * Oturumu kapatma işlemini gerçekleştiren Use Case.
- * SRP: Sadece oturum kapatma iş mantığını içerir.
+ * UseCase responsible for terminating the current user session.
+ *
+ * **Architectural Importance:**
+ * While currently a simple delegation to the repository, this UseCase is the designated
+ * place for any **Session Cleanup Logic**.
+ *
+ * Examples of future logic to add here:
+ * - Clearing local Room database cache (user-specific data).
+ * - Unsubscribing from Firebase Cloud Messaging (FCM) topics.
+ * - Sending a "Logout" analytics event.
  */
 class SignOutUseCase @Inject constructor(
     private val authRepository: AuthRepository
 ) {
     /**
-     * Use case'i fonksiyon gibi çağırmak için.
-     * @return Başarılı olursa Result.success(Unit), veya hata.
+     * Executes the sign-out process.
+     *
+     * @return [Result.Success] if the session was cleared successfully, or [Result.Error] otherwise.
      */
     suspend operator fun invoke(): Result<Unit> {
         return authRepository.signOut()

@@ -20,8 +20,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 
-// --- YENİ VE TEMİZ UI STATE ---
-// Hata alanları birleştirildi. Gereksiz alanlar kaldırıldı.
 data class BookingUiState(
     val isLoadingService: Boolean = true,
     val service: Service? = null,
@@ -34,9 +32,9 @@ data class BookingUiState(
     val customerEmail: String = "",
     val isBooking: Boolean = false,
     val bookingComplete: Boolean = false,
-    @StringRes val error: Int? = null, // Tüm genel hatalar için
-    @StringRes val nameError: Int? = null, // Sadece isim alanı için
-    @StringRes val phoneError: Int? = null // Sadece telefon alanı için
+    @StringRes val error: Int? = null,
+    @StringRes val nameError: Int? = null,
+    @StringRes val phoneError: Int? = null
 )
 
 sealed interface BookingViewEvent {
@@ -44,6 +42,18 @@ sealed interface BookingViewEvent {
     data class ShowSnackbar(@StringRes val messageId: Int) : BookingViewEvent
 }
 
+/**
+ * ViewModel managing the state and logic of the Booking Flow.
+ *
+ * **Responsibilities:**
+ * - **Initialization:** Fetches Service details based on the ID passed via Navigation.
+ * - **State Management:** Manages selected Date, Time, and User Input.
+ * - **Availability Logic:** Triggers [GetAvailableSlotsUseCase] whenever the date changes to fetch free slots.
+ * - **Validation:** Validates customer input (Name, Phone) before submission.
+ * - **Transaction:** Executes the final booking transaction via [CreateAppointmentUseCase], ensuring data integrity.
+ *
+ * Follows the MVI/MVVM pattern using [BookingUiState] and [BookingViewEvent].
+ */
 @HiltViewModel
 class BookingViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -52,6 +62,8 @@ class BookingViewModel @Inject constructor(
     private val createAppointmentUseCase: CreateAppointmentUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase
 ) : ViewModel() {
+
+    // Retrieve the service ID from navigation arguments (Mandatory)
     private val serviceId: String = savedStateHandle.get<String>("serviceId")!!
 
     private val _uiState = MutableStateFlow(BookingUiState())
@@ -72,18 +84,20 @@ class BookingViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingService = true) }
+
             when (val result = getServiceDetailsUseCase(serviceId)) {
                 is Result.Success -> {
                     val service = result.data
-                    _uiState.update { it.copy(service = service) }
                     if (service != null) {
                         _uiState.update { it.copy(service = service) }
+                        // Once service is loaded (we need duration), load slots for today
                         loadAvailableSlotsForDate(uiState.value.selectedDate)
                     } else {
                         _uiState.update { it.copy(isLoadingService = false, error = R.string.error_service_not_found) }
                     }
                 }
                 is Result.Error -> {
+                    Timber.e(result.exception, "Error loading service details")
                     _uiState.update { it.copy(isLoadingService = false, error = R.string.error_loading_service_details) }
                 }
                 is Result.Loading -> {}
@@ -93,9 +107,13 @@ class BookingViewModel @Inject constructor(
 
     private fun loadAvailableSlotsForDate(date: LocalDate) {
         val serviceDuration = uiState.value.service?.durationMinutes ?: return
+
         _uiState.update { it.copy(isLoadingSlots = true, availableSlots = emptyList(), selectedSlot = null) }
+
         viewModelScope.launch {
+            // Use the constant Target Owner ID (White Label Architecture)
             val ownerId = FirebaseConstants.TARGET_BUSINESS_OWNER_ID
+
             getAvailableSlotsUseCase(ownerId, date, serviceDuration)
                 .collect { result ->
                     _uiState.update {
@@ -106,7 +124,10 @@ class BookingViewModel @Inject constructor(
                                 availableSlots = result.data,
                                 error = if (result.data.isEmpty()) R.string.booking_screen_no_slots else null
                             )
-                            is Result.Error -> it.copy(isLoadingService = false, isLoadingSlots = false, error = R.string.error_loading_slots)
+                            is Result.Error -> {
+                                Timber.e(result.exception, "Error loading slots")
+                                it.copy(isLoadingService = false, isLoadingSlots = false, error = R.string.error_loading_slots)
+                            }
                             is Result.Loading -> it.copy(isLoadingSlots = true)
                         }
                     }
@@ -135,13 +156,12 @@ class BookingViewModel @Inject constructor(
         _uiState.update { it.copy(customerEmail = email) }
     }
 
-    // --- DÜZELTİLMİŞ validateForm FONKSİYONU ---
     private fun validateForm(): Boolean {
         val state = uiState.value
         val nameError = if (state.customerName.isBlank()) R.string.error_name_empty else null
         val phoneError = when {
             state.customerPhone.isBlank() -> R.string.error_phone_empty
-            state.customerPhone.length < 10 -> R.string.error_phone_length // Örnek validasyon
+            state.customerPhone.length < 10 -> R.string.error_phone_length // Minimum length check
             else -> null
         }
 
@@ -150,7 +170,6 @@ class BookingViewModel @Inject constructor(
         return nameError == null && phoneError == null
     }
 
-    // --- DÜZELTİLMİŞ confirmBooking FONKSİYONU ---
     fun confirmBooking() {
         if (!validateForm()) return
 
@@ -174,6 +193,7 @@ class BookingViewModel @Inject constructor(
                 _eventFlow.emit(BookingViewEvent.ShowSnackbar(R.string.error_auth_user_not_found))
                 return@launch
             }
+
             val result = createAppointmentUseCase(
                 ownerId = FirebaseConstants.TARGET_BUSINESS_OWNER_ID,
                 servicePriceInCents = service.priceInCents,
@@ -190,10 +210,12 @@ class BookingViewModel @Inject constructor(
 
             when (result) {
                 is Result.Success -> {
+                    Timber.i("Booking successful!")
                     _uiState.update { it.copy(isBooking = false, bookingComplete = true) }
                     _eventFlow.emit(BookingViewEvent.NavigateToConfirmation)
                 }
                 is Result.Error -> {
+                    Timber.e(result.exception, "Booking failed")
                     _uiState.update { it.copy(isBooking = false) }
                     _eventFlow.emit(BookingViewEvent.ShowSnackbar(R.string.error_booking_failed))
                 }

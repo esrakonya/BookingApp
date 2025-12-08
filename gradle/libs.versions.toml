@@ -1,111 +1,118 @@
-# gradle/libs.versions.toml
-
 [versions]
-# Android & Gradle
-agp = "8.2.0" # Güncel AGP sürümünü kontrol et
-gradle = "8.7" # AGP ile uyumlu Gradle sürümünü kontrol et (wrapper'dan)
+# ==========================================================
+# 1. BUILD SYSTEM & PLUGINS
+# ==========================================================
+agp = "8.3.2"                # Android Gradle Plugin (Stable). Ensure compatibility with Android Studio.
+kotlin = "1.9.24"            # Kotlin Language Version.
+ksp = "1.9.24-1.0.20"        # Kotlin Symbol Processing. CRITICAL: Must match the Kotlin version exactly.
+googleServices = "4.4.2"     # Required for Firebase integration.
 
-# Kotlin & Compose
-kotlin = "1.9.24" # Kotlin 2.x
-composeBom = "2024.04.01" # Kullandığın Compose BOM
-ksp = "1.9.24-1.0.20"
-composeCompiler = "1.5.14" # Kotlin 2.1.10 ile uyumlu Compose Compiler (Haritadan kontrol et!)
+# ==========================================================
+# 2. ANDROID CORE & LIFECYCLE
+# ==========================================================
+coreKtx = "1.13.1"
+activityCompose = "1.9.0"    # Stable release used to avoid alpha/beta instability.
+lifecycle = "2.8.0"          # Manages UI lifecycle (ViewModel, etc.).
 
-# AndroidX Core & Activity (compileSdk 35 gerektirebilir)
-coreKtx = "1.13.1" # Kararlı sürümü kontrol et
-activityCompose = "1.10.0" # Kararlı sürümü kontrol et
+# ==========================================================
+# 3. JETPACK COMPOSE
+# ==========================================================
+composeBom = "2024.05.00"    # Bill of Materials (BOM) to manage Compose versions automatically.
+navigationCompose = "2.7.7"  # Navigation component for Compose.
+# CRITICAL: This compiler version is strictly tied to Kotlin 1.9.24.
+# Do not change this unless you also upgrade Kotlin.
+composeCompiler = "1.5.14"
 
-# Lifecycle & Navigation
-lifecycle = "2.8.7" # lifecycleRuntimeKtx yerine genel lifecycle kullanalım
-navigationCompose = "2.7.7" # Navigation sürümünü kontrol et
-
-# Hilt
-hilt = "2.51.1" # Hilt sürümünü kontrol et
+# ==========================================================
+# 4. DEPENDENCY INJECTION (HILT)
+# ==========================================================
+hilt = "2.51.1"              # Dagger Hilt for Dependency Injection.
 hiltNavigationCompose = "1.2.0"
 
-# Firebase & Google Services
-firebaseBom = "32.8.0"
-googleServices = "4.4.2" # Güncel Google Services sürümünü kontrol et
+# ==========================================================
+# 5. FIREBASE & NETWORK
+# ==========================================================
+firebaseBom = "33.0.0"       # Firebase BOM ensures all Firebase libraries use compatible versions.
+coil = "2.6.0"               # Image loading library for Compose.
 
-# Diğer Kütüphaneler
-coroutines = "1.7.3"
-coil = "2.6.0"
-javaxInject = "1"
-desugarJdkLibs = "2.0.4"
+# ==========================================================
+# 6. UTILITIES & UI COMPONENTS
+# ==========================================================
+timber = "5.0.1"             # Advanced logging.
+desugarJdkLibs = "2.0.4"     # Java 8+ API desugaring support for older Android versions.
+calendar = "2.5.2"           # 'Kizitonwose' Calendar library for Compose.
+splashScreen = "1.0.1"       # Android 12+ Splash Screen API.
 
-# Testing
+# ==========================================================
+# 7. TESTING LIBRARIES
+# ==========================================================
 junit = "4.13.2"
-androidxTestExtJunit = "1.2.1" # Eski junitVersion yerine
-espressoCore = "3.6.1"
-mockk = "1.13.11"
-coroutinesTest = "1.7.3"
-turbine = "1.1.0"
-androidxArchCoreTesting = "2.2.0"
-
-timber = "5.0.1"
+junitVersion = "1.1.5"       # AndroidX JUnit Extensions.
+espressoCore = "3.5.1"       # UI Testing framework.
+mockk = "1.13.11"            # Mocking library for Kotlin.
+coroutines = "1.7.3"         # Coroutines support for tests.
+turbine = "1.1.0"            # Flow testing library.
+archCoreTesting = "2.2.0"    # Testing helper for LiveData/Architecture components.
+truth = "1.4.2"              # Google's fluent assertion library.
 
 [libraries]
-# AndroidX Core & Activity
+# --- Core Android Libraries ---
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-
-# Lifecycle & Navigation
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
-androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
-androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+android-desugarJdkLibs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 
-# Compose (BOM yönetecek)
+# --- Jetpack Compose (Managed via BOM) ---
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
-androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" } # Full icon set
+androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }
 
-# Coroutines
+# --- Navigation & Architecture ---
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+# --- Dependency Injection (Hilt) ---
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
+hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+
+# --- Firebase (Via BOM) ---
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+
+# --- Third Party UI & Tools ---
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+calendar-compose = { group = "com.kizitonwose.calendar", name = "compose", version.ref = "calendar" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashScreen" }
+
+# --- Coroutines ---
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
-# Hilt
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
-hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" } # Kapt için
-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
-
-# Firebase (BOM yönetecek)
-firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
-firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
-firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx" }
-
-# Diğer
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
-javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaxInject" }
-android-desugarJdkLibs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
-
-# Testing
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" } # Alias düzeltildi
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-
-# Mocking
-mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
-mockk-agent = { group = "io.mockk", name = "mockk-agent-jvm", version.ref = "mockk" }
-
-# Coroutines Test
-kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
-
-# Flow Testing (Turbine)
-turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
-
-# ViewModel Testing Helper
-androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "androidxArchCoreTesting" }
-
-# Log
+# --- Utilities ---
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+javax-inject = { group = "javax.inject", name = "javax.inject", version = "1" }
 
-androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }
+# --- Unit Testing ---
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "archCoreTesting" }
+google-truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
+
+# --- UI Testing (Android Test) ---
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -113,21 +120,41 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-# kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
-# ksp = { ... } # KSP kullanmıyoruz
 
 [bundles]
+# Core Compose UI libraries bundled for cleaner gradle files
 compose = [
     "androidx-activity-compose",
     "androidx-compose-ui",
     "androidx-compose-ui-graphics",
     "androidx-compose-ui-tooling-preview",
     "androidx-compose-material3",
-    "androidx-navigation-compose",
-    "androidx-lifecycle-viewmodel-compose",
+    "androidx-compose-material-icons-extended",
     "androidx-compose-animation",
+    "androidx-navigation-compose",
+    "androidx-lifecycle-viewmodel-compose"
 ]
-coroutines = ["kotlinx-coroutines-core", "kotlinx-coroutines-android"]
-androidTest = ["androidx-test-ext-junit", "androidx-espresso-core", "androidx-compose-ui-test-junit4"] # Alias düzeltildi
-debug = ["androidx-compose-ui-tooling", "androidx-compose-ui-test-manifest"]
-unitTest = ["junit", "kotlinx-coroutines-test", "mockk-android", "mockk-agent", "turbine", "androidx-arch-core-testing"]
+
+# Unit Testing Bundle
+unitTest = [
+    "junit",
+    "mockk",
+    "kotlinx-coroutines-test",
+    "turbine",
+    "androidx-arch-core-testing",
+    "google-truth"
+]
+
+# UI Testing Bundle
+androidTest = [
+    "androidx-test-ext-junit",
+    "androidx-espresso-core",
+    "androidx-compose-ui-test-junit4",
+    "mockk-android"
+]
+
+# Debug Tools Bundle
+debug = [
+    "androidx-compose-ui-tooling",
+    "androidx-compose-ui-test-manifest"
+]

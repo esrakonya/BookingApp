@@ -38,6 +38,15 @@ sealed interface LoginViewEvent {
     data class ShowSnackbar(@StringRes val messageId: Int): LoginViewEvent
 }
 
+/**
+ * Manages the UI state for the Customer Login screen.
+ *
+ * **Responsibilities:**
+ * - Handles email/password input and validation.
+ * - Executes login via [SignInUseCase].
+ * - **Role Verification:** Enforces security by checking if the logged-in user has the "customer" role.
+ * - Maps Firebase exceptions to user-friendly error messages (Resource IDs).
+ */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val signInUseCase: SignInUseCase,
@@ -93,7 +102,7 @@ class LoginViewModel @Inject constructor(
             null
         }
 
-        // Sadece state değiştiyse güncelleme yapalım
+        // Only update state if the error values have actually changed to avoid unnecessary recompositions
         if (newEmailError != state.emailErrorRes || newPasswordError != state.passwordErrorRes) {
             _uiState.update {
                 it.copy(emailErrorRes = newEmailError, passwordErrorRes = newPasswordError)
@@ -107,46 +116,40 @@ class LoginViewModel @Inject constructor(
 
         viewModelScope.launch {
             Timber.d("Attempting sign in for email: $email")
-            // SignInUseCase'in `suspend operator fun invoke(...): Result<AuthUser>` döndürdüğünü varsayıyoruz.
             when (val result = signInUseCase(email, password)) {
                 is Result.Success -> {
                     val user = result.data
 
-                    // --- YENİ ROL KONTROLÜ ---
+                    // --- SECURITY: ROLE CHECK ---
                     if (user.role == "customer") {
-                        // Rol doğru (müşteri), devam et.
+                        // Correct role, proceed to home
                         Timber.i("Customer sign in successful for: ${user.uid}")
                         _uiState.update { it.copy(isLoading = false) }
                         _eventFlow.emit(LoginViewEvent.NavigateTo(ScreenRoutes.ServiceList.route))
                     } else {
-                        // Rol yanlış (işletme sahibi müşteri girişinden girmeye çalışıyor).
-                        Timber.w("Owner (role=${user.role}) attempted to sign in via customer login.")
+                        // Incorrect role (Owner tried to login via Customer portal)
+                        Timber.w("Security Alert: Owner (role=${user.role}) attempted to sign in via customer login.")
                         _uiState.update { it.copy(isLoading = false) }
-                        // Yeni bir hata mesajı için strings.xml'e ekleme yapmamız gerekecek.
                         _eventFlow.emit(LoginViewEvent.ShowSnackbar(R.string.error_auth_owner_at_customer_login))
-                        // Çıkış yaptırarak Auth state'ini temizlemek iyi bir pratiktir.
+
+                        // Force sign out to clear the invalid session
                         signOutUseCase()
                     }
                 }
                 is Result.Error -> {
-                    // Hatalı giriş, result.exception ve result.message kullanılabilir
                     Timber.w(result.exception, "Sign in failed for email: $email. Message: ${result.message}")
                     val errorRes = when (result.exception) {
                         is FirebaseNetworkException -> R.string.error_network_connection
                         is FirebaseAuthInvalidCredentialsException -> R.string.error_auth_invalid_credentials
-                        is FirebaseAuthInvalidUserException -> R.string.error_auth_invalid_credentials // Veya yine invalid_credentials
-                        is IllegalArgumentException -> R.string.error_auth_generic_signup // Validasyon hatası UseCase'den geliyorsa
-                        else -> R.string.error_login_failed // Diğer genel hatalar
+                        is FirebaseAuthInvalidUserException -> R.string.error_auth_invalid_credentials // Treat as invalid credentials for security
+                        is IllegalArgumentException -> R.string.error_auth_generic_signup // Validation error from UseCase
+                        else -> R.string.error_login_failed // Generic fallback
                     }
                     _uiState.update { it.copy(isLoading = false, generalErrorRes = errorRes) }
                     _eventFlow.emit(LoginViewEvent.ShowSnackbar(errorRes))
                 }
                 is Result.Loading -> {
-                    // Bu case'in `suspend fun` bir UseCase için çalışması beklenmez.
-                    // UseCase ya Success ya da Error döndürmelidir.
-                    // Eğer UseCase'iniz Flow döndürüyorsa bu durum geçerli olurdu.
-                    Timber.d("SignInUseCase returned Loading state (unexpected for a direct suspend function result).")
-                    // UI'da zaten isLoading = true olduğu için ek bir güncelleme gerekmeyebilir.
+                    Timber.d("SignInUseCase returned Loading state (unexpected for a direct suspend function).")
                 }
             }
         }

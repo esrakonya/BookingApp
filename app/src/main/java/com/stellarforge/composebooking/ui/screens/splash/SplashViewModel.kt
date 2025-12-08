@@ -2,11 +2,11 @@ package com.stellarforge.composebooking.ui.screens.splash
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import com.stellarforge.composebooking.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,101 +14,73 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * ViewModel for the Splash Screen.
+ *
+ * **Responsibilities:**
+ * - **Startup Orchestration:** Manages the initial app launch sequence.
+ * - **Branding Delay:** Enforces a minimum display time for the logo to prevent UI flickering on fast devices.
+ * - **Route Determination:** Checks the user's session and role (Owner vs. Customer) to decide the start destination.
+ */
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val getCurrentUserUseCase: GetCurrentUserUseCase
 ) : ViewModel() {
 
+    // Holds the navigation target. Null means "Still Loading".
     private val _startDestination = MutableStateFlow<String?>(null)
     val startDestination: StateFlow<String?> = _startDestination.asStateFlow()
 
-    private var listenerAttached = false
-    private var authStateListener: FirebaseAuth.AuthStateListener? = null
-
     init {
-        Timber.d("SplashViewModel initialized.")
-        determineStartDestination()
+        initializeSplashScreen()
     }
 
-    private fun determineStartDestination() {
-        if (_startDestination.value != null) return
-
+    private fun initializeSplashScreen() {
         viewModelScope.launch {
-            when (val result = getCurrentUserUseCase()) {
-                is Result.Success -> {
-                    val authUser = result.data
-                    if (authUser != null && authUser.uid.isNotBlank()) {
-                        Timber.i("User authenticated. UID: ${authUser.uid}, Role: ${authUser.role}")
+            // 1. Minimum delay for branding visibility (2 seconds)
+            // Ensures the user sees the logo even if the auth check is instant.
+            val minSplashTime = System.currentTimeMillis() + 2000
 
-                        _startDestination.value = if (authUser.role == "owner") {
-                            ScreenRoutes.Schedule.route
-                        } else {
-                            ScreenRoutes.ServiceList.route
-                        }
-                    } else {
-                        Timber.i("No authenticated user found. Navigate to Login.")
-                        _startDestination.value = ScreenRoutes.Login.route
-                    }
-                }
-                is Result.Error -> {
-                    Timber.e(result.exception, "Error checking user authentication.")
-                    _startDestination.value = ScreenRoutes.Login.route
-                }
-                is Result.Loading -> {}
+            // 2. Verify User Session
+            val destination = checkUserStatus()
+
+            // 3. Wait for the remaining time if logic finished too fast
+            val delayTime = minSplashTime - System.currentTimeMillis()
+            if (delayTime > 0) {
+                delay(delayTime)
             }
+
+            // 4. Set navigation destination (Triggers UI navigation)
+            _startDestination.value = destination
         }
     }
 
-    /*private fun setupAndAttachAuthStateListener() {
-        authStateListener = FirebaseAuth.AuthStateListener { auth ->
-            // Bu listener ana thread'de çağrılabilir, ancak UI güncellemeleri için
-            // viewModelScope kullanmak iyi bir pratiktir, özellikle token alma gibi
-            // asenkron bir işlem yapacaksak.
-            viewModelScope.launch {
-                // Yönlendirme sadece _startDestination null ise yapılsın
-                // ve listener daha önce işlem yapmadıysa (bu kontrol zaten listenerAttached ile sağlanıyor olabilir ama ek güvenlik)
-                if (_startDestination.value == null) {
-                    val firebaseUser = auth.currentUser
-                    if (firebaseUser != null) {
-                        Timber.d("AuthStateListener: User is signed in (UID: ${firebaseUser.uid}). Attempting to get ID token before navigation.")
-                        // Token'ı almayı dene (bu, backend ile senkronizasyonu zorlayabilir)
-                        // `false` parametresi, token süresi dolmamışsa mevcut token'ı kullanır,
-                        // dolmuşsa veya yoksa yenisini alır. Bu işlem ağ çağrısı yapabilir.
-                        firebaseUser.getIdToken(true)
-                            .addOnCompleteListener { task ->
-                                // addOnCompleteListener farklı bir thread'de çalışabilir,
-                                // StateFlow güncellemesini ana thread'e (veya viewModelScope'a) almak güvenlidir.
-                                viewModelScope.launch {
-                                    if (task.isSuccessful && task.result?.token != null) {
-                                        Timber.i("SplashViewModel: ID Token retrieved successfully. Navigating to ServiceList.")
-                                        _startDestination.value = ScreenRoutes.ServiceList.route
-                                    } else {
-                                        Timber.e(task.exception, "SplashViewModel: Failed to get ID token or token is null after sign-in. Navigating to Login as fallback.")
-                                        // Token alınamazsa (bir sorun var demektir), yine de Login'e yönlendir.
-                                        _startDestination.value = ScreenRoutes.Login.route
-                                    }
-                                }
-                            }
+    /**
+     * Checks if a user is logged in and determines their role.
+     * @return The route string for the next screen.
+     */
+    private suspend fun checkUserStatus(): String {
+        return when (val result = getCurrentUserUseCase()) {
+            is Result.Success -> {
+                val authUser = result.data
+                if (authUser != null && authUser.uid.isNotBlank()) {
+                    Timber.i("User authenticated. Role: ${authUser.role}")
+
+                    // Role-Based Navigation Logic
+                    if (authUser.role == "owner") {
+                        ScreenRoutes.Schedule.route // Go to Admin Dashboard
                     } else {
-                        Timber.d("AuthStateListener: User is signed out. Navigating to Login.")
-                        _startDestination.value = ScreenRoutes.Login.route
+                        ScreenRoutes.ServiceList.route // Go to Customer Storefront
                     }
                 } else {
-                    Timber.d("AuthStateListener: Start destination already set to ${_startDestination.value}, ignoring further auth state changes in Splash.")
+                    ScreenRoutes.Login.route // Go to Login
                 }
             }
+            is Result.Error -> {
+                Timber.e(result.exception, "Auth check failed during splash.")
+                ScreenRoutes.Login.route // Fail-safe: Go to Login
+            }
+            else -> ScreenRoutes.Login.route
         }
-        firebaseAuth.addAuthStateListener(authStateListener!!)
-        Timber.d("AuthStateListener attached.")
-    }*/
-
-    /*override fun onCleared() {
-        super.onCleared()
-        authStateListener?.let {
-            firebaseAuth.removeAuthStateListener(it)
-            Timber.d("SplashViewModel cleared. AuthStateListener removed.")
-        }
-        listenerAttached = false
-        authStateListener = null
-    }*/
+    }
 }
