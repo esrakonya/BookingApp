@@ -19,40 +19,40 @@ import com.stellarforge.composebooking.R
  */
 sealed class BottomNavItem(
     val route: String,
-    @StringRes val titleResId: Int, // String yerine ID (Çoklu dil için)
+    @StringRes val titleResId: Int,
     val icon: ImageVector
 ) {
     // --- CUSTOMER MENU ---
     object CustomerHome : BottomNavItem(
         route = ScreenRoutes.ServiceList.route,
-        titleResId = R.string.service_list_title, // "Services"
+        titleResId = R.string.service_list_title,
         icon = Icons.Default.Home
     )
     object MyBookings : BottomNavItem(
         route = ScreenRoutes.MyBookings.route,
-        titleResId = R.string.my_bookings_screen_title, // "My Bookings"
+        titleResId = R.string.my_bookings_screen_title,
         icon = Icons.Default.DateRange
     )
     object CustomerProfile : BottomNavItem(
         route = ScreenRoutes.CustomerProfile.route,
-        titleResId = R.string.screen_title_account, // "Account"
+        titleResId = R.string.screen_title_account,
         icon = Icons.Default.Person
     )
 
     // --- OWNER MENU ---
     object Schedule : BottomNavItem(
         route = ScreenRoutes.Schedule.route,
-        titleResId = R.string.schedule_screen_title, // "Schedule"
+        titleResId = R.string.schedule_screen_title,
         icon = Icons.Default.CalendarToday
     )
     object ManageServices : BottomNavItem(
         route = ScreenRoutes.ManageServices.route,
-        titleResId = R.string.manage_services_screen_title, // "Services" (Admin)
+        titleResId = R.string.manage_services_screen_title,
         icon = Icons.Default.List
     )
     object BusinessProfile : BottomNavItem(
         route = ScreenRoutes.BusinessProfile.route,
-        titleResId = R.string.screen_title_business_profile, // "Profile"
+        titleResId = R.string.screen_title_business_profile,
         icon = Icons.Default.Settings
     )
 }

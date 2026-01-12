@@ -1,9 +1,11 @@
 package com.stellarforge.composebooking.ui.screens.servicelist
 
 import app.cash.turbine.test
+import com.google.common.truth.Truth.assertThat
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
+import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.domain.repository.AppointmentRepository
 import com.stellarforge.composebooking.domain.repository.ServiceRepository
@@ -20,7 +22,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -32,8 +33,9 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Tests the Customer Home Screen logic, including:
  * - Fetching the list of available services.
- * - Loading the business profile.
- * - Error states.
+ * - Loading the business profile (Branding).
+ * - Error handling and Retry logic.
+ * - Sign out flow.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServiceListViewModelTest {
@@ -61,8 +63,10 @@ class ServiceListViewModelTest {
 
     private lateinit var viewModel: ServiceListViewModel
 
+    // Test Data
     private val fakeAuthUser = AuthUser("test_uid", "test@test.com")
-    private val fakeServices = listOf(Service(id = "s1", name = "Service 1"))
+    private val fakeServices = listOf(Service(id = "s1", name = "Haircut"))
+    private val fakeBusinessProfile = BusinessProfile(businessName = "The Urban Cut", address = "NYC")
 
     @Before
     fun setUp() {
@@ -70,7 +74,7 @@ class ServiceListViewModelTest {
         mockkStatic(FirebaseFirestoreException.Code::class)
         every { FirebaseFirestoreException.Code.values() } returns emptyArray()
 
-        // Redirect Timber logs to System.out for test debugging
+        // Redirect Timber logs to System.out for better debugging in tests
         Timber.uprootAll()
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
@@ -87,8 +91,8 @@ class ServiceListViewModelTest {
 
     private fun createViewModel() {
         viewModel = ServiceListViewModel(
+            appointmentRepository = mockAppointmentRepository, // Not used but required
             serviceRepository = mockServiceRepository,
-            appointmentRepository = mockAppointmentRepository,
             signOutUseCase = mockSignOutUseCase,
             getCurrentUserUseCase = mockGetCurrentUserUseCase,
             getBusinessProfileUseCase = mockGetBusinessProfileUseCase
@@ -98,30 +102,39 @@ class ServiceListViewModelTest {
     @Test
     fun `init - when user exists - loads services and business profile successfully`() = runTest {
         // ARRANGE
+        // 1. User Check
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(fakeAuthUser)
 
-        // Using constant TARGET_ID for business profile
-        every { mockGetBusinessProfileUseCase(FirebaseConstants.TARGET_BUSINESS_OWNER_ID) } returns flowOf(Result.Success(null))
+        // 2. Business Profile Load
+        every {
+            mockGetBusinessProfileUseCase(FirebaseConstants.TARGET_BUSINESS_OWNER_ID)
+        } returns flowOf(Result.Success(fakeBusinessProfile))
 
-        // Ensure we call the customer stream
+        // 3. Service List Load
         every { mockServiceRepository.getCustomerServicesStream() } returns flowOf(Result.Success(fakeServices))
 
         // ACT
         createViewModel()
 
-        // ASSERT
+        // ASSERT UI STATE
         viewModel.uiState.test {
             // First: Loading
-            assertEquals(ServiceListUiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(ServiceListUiState.Loading)
 
             // Second: Success
             val successState = awaitItem()
-            assertTrue("State should be Success", successState is ServiceListUiState.Success)
-            assertEquals(fakeServices, (successState as ServiceListUiState.Success).services)
+            assertThat(successState).isInstanceOf(ServiceListUiState.Success::class.java)
+            assertThat((successState as ServiceListUiState.Success).services).isEqualTo(fakeServices)
 
             cancelAndIgnoreRemainingEvents()
         }
 
+        // ASSERT BUSINESS PROFILE STATE (Separate Flow)
+        val profileState = viewModel.businessProfile.value
+        assertThat(profileState).isNotNull()
+        assertThat(profileState?.businessName).isEqualTo(fakeBusinessProfile.businessName)
+
+        // VERIFY CALLS
         coVerify(exactly = 1) { mockGetCurrentUserUseCase() }
         verify(exactly = 1) { mockGetBusinessProfileUseCase(FirebaseConstants.TARGET_BUSINESS_OWNER_ID) }
         verify(exactly = 1) { mockServiceRepository.getCustomerServicesStream() }
@@ -132,26 +145,29 @@ class ServiceListViewModelTest {
         // ARRANGE
         val authException = Exception("Auth failed")
 
-        // 1. User check fails
+        // User check fails
         coEvery { mockGetCurrentUserUseCase() } returns Result.Error(authException)
 
+        // Profile might still load (independent flow), let's say it returns null for this test
         every { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
 
         // ACT
         createViewModel()
+
+        // Wait for coroutines to settle
         mainDispatcherRule.scheduler.advanceUntilIdle()
 
         // ASSERT
-        var currentState = viewModel.uiState.value
+        val currentState = viewModel.uiState.value
 
-        assertTrue("Final state should be Error", currentState is ServiceListUiState.Error)
-        assertEquals(
-            R.string.error_auth_user_not_found_for_services,
-            (currentState as ServiceListUiState.Error).messageResId
-        )
+        assertThat(currentState).isInstanceOf(ServiceListUiState.Error::class.java)
+
+        // It should return the specific error resource for auth failure
+        val errorState = currentState as ServiceListUiState.Error
+        assertThat(errorState.messageResId).isEqualTo(R.string.error_auth_user_not_found_for_services)
 
         // Services should NOT be fetched if auth fails
-        coVerify(exactly = 0) { mockServiceRepository.getCustomerServicesStream() }
+        verify(exactly = 0) { mockServiceRepository.getCustomerServicesStream() }
     }
 
     @Test
@@ -163,7 +179,7 @@ class ServiceListViewModelTest {
 
         createViewModel()
 
-        // Consume initial flow
+        // Consume initial flow to clear the buffer
         viewModel.uiState.test {
             awaitItem() // Loading
             awaitItem() // Success
@@ -175,23 +191,26 @@ class ServiceListViewModelTest {
 
         // ASSERT
         viewModel.uiState.test {
-            // Loading again
-            assertEquals(ServiceListUiState.Loading, awaitItem())
-            // Success again
-            assertTrue(awaitItem() is ServiceListUiState.Success)
+            // Should emit Loading again
+            assertThat(awaitItem()).isEqualTo(ServiceListUiState.Loading)
+            // Then Success again
+            assertThat(awaitItem()).isInstanceOf(ServiceListUiState.Success::class.java)
             cancelAndIgnoreRemainingEvents()
         }
 
-        // Verify it was called twice
+        // Verify it was called twice (Initial + Retry)
         coVerify(exactly = 2) { mockGetCurrentUserUseCase() }
     }
 
     @Test
     fun `signOut - when use case succeeds - emits NavigateToLogin event`() = runTest {
         // ARRANGE
+        // Setup successful init to avoid crashes
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(fakeAuthUser)
         every { mockServiceRepository.getCustomerServicesStream() } returns flowOf(Result.Success(emptyList()))
         every { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
+
+        // Sign Out Success
         coEvery { mockSignOutUseCase() } returns Result.Success(Unit)
 
         createViewModel()
@@ -199,7 +218,10 @@ class ServiceListViewModelTest {
         // ACT & ASSERT
         viewModel.eventFlow.test(timeout = 3.seconds) {
             viewModel.signOut()
-            assertEquals(ServiceListViewEvent.NavigateToLogin, awaitItem())
+
+            // Verify Navigation Event
+            assertThat(awaitItem()).isEqualTo(ServiceListViewEvent.NavigateToLogin)
+
             cancelAndConsumeRemainingEvents()
         }
 

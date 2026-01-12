@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -40,7 +39,6 @@ import kotlinx.coroutines.launch
  * - Navigates to the Owner Dashboard (Schedule) upon success.
  * - Provides navigation back to the Customer Sign-Up flow.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OwnerSignUpScreen(
     navController: NavController,
@@ -87,8 +85,8 @@ fun OwnerSignUpScreen(
         snackbarHostState = snackbarHostState,
 
         // --- Text Resources ---
-        title = stringResource(R.string.owner_signup_title), // "Create Business Account"
-        subtitle = stringResource(R.string.owner_signup_subtitle), // "Start managing your business today."
+        title = stringResource(R.string.owner_signup_title),
+        subtitle = stringResource(R.string.owner_signup_subtitle),
 
         // --- Footer: Link to Customer Sign Up ---
         footerContent = {
@@ -106,7 +104,7 @@ fun OwnerSignUpScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(id = R.string.signup_customer_link)) // "Want to sign up as customer?"
+                    Text(stringResource(id = R.string.signup_customer_link))
                 }
             }
         }

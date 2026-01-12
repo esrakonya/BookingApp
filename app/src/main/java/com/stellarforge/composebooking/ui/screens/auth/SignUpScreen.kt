@@ -73,7 +73,7 @@ fun SignUpScreen(
 
         // --- Customer Specific Text ---
         title = stringResource(id = R.string.signup_title),
-        subtitle = stringResource(id = R.string.signup_subtitle), // "Create your account"
+        subtitle = stringResource(id = R.string.signup_subtitle),
 
         // --- Footer: Link to Owner Sign Up ---
         footerContent = {
@@ -92,7 +92,7 @@ fun SignUpScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(id = R.string.signup_owner_link)) // "Create Business Account"
+                    Text(stringResource(id = R.string.signup_owner_link))
                 }
             }
         }

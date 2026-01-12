@@ -1,5 +1,6 @@
 package com.stellarforge.composebooking.domain.repository
 
+import android.net.Uri
 import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.utils.Result
 import kotlinx.coroutines.flow.Flow
@@ -7,33 +8,35 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Defines the contract for managing the Business Profile (Storefront) data within the Domain layer.
  *
- * This repository is responsible for fetching and updating the public-facing details of the business
- * (e.g., Business Name, Address, Contact Info) that are displayed to customers.
+ * This repository is responsible for:
+ * 1. Fetching the public-facing details (Name, Address, etc.).
+ * 2. Updating profile information.
+ * 3. Handling Branding assets (Logo upload).
  */
 interface BusinessProfileRepository {
 
     /**
-     * Retrieves the business profile for a specific owner and provides a real-time stream via [Flow].
-     *
-     * This stream reflects changes instantly. For example, if the owner changes the shop name,
-     * the customer app updates immediately without refreshing.
+     * Retrieves the business profile for a specific owner and provides a real-time stream.
      *
      * @param ownerUserId The unique ID of the business owner.
-     * @return A [Flow] emitting [Result]:
-     *         - [Result.Success] containing [BusinessProfile] if found.
-     *         - [Result.Success] containing `null` if the profile document does not exist yet (New Business).
-     *         - [Result.Error] if the network request fails.
+     * @return A [Flow] emitting the profile data or null if not set.
      */
     fun getBusinessProfile(ownerUserId: String): Flow<Result<BusinessProfile?>>
 
     /**
      * Persists or updates the business profile details.
      *
-     * This operation performs an "Upsert" (Update or Insert) strategy in the data layer.
-     *
      * @param ownerUserId The unique ID of the business owner.
-     * @param profile The [BusinessProfile] object containing the new data.
-     * @return [Result.Success] if the write operation completes, or [Result.Error] otherwise.
+     * @param profile The [BusinessProfile] object containing new data.
      */
     suspend fun updateBusinessProfile(ownerUserId: String, profile: BusinessProfile): Result<Unit>
+
+    /**
+     * Uploads the business logo to Cloud Storage.
+     *
+     * @param uri The local URI of the image selected from the gallery.
+     * @param ownerId The unique ID of the business owner (used for file naming).
+     * @return [Result.Success] containing the **Download URL** (String) if successful.
+     */
+    suspend fun uploadLogo(uri: Uri, ownerId: String): Result<String>
 }

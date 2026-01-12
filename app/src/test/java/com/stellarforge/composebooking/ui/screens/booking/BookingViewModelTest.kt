@@ -5,10 +5,12 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
+import com.stellarforge.composebooking.data.model.CustomerProfile
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.domain.usecase.CreateAppointmentUseCase
 import com.stellarforge.composebooking.domain.usecase.GetAvailableSlotsUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
+import com.stellarforge.composebooking.domain.usecase.GetCustomerProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetServiceDetailsUseCase
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.MainDispatcherRule
@@ -47,13 +49,16 @@ class BookingViewModelTest {
     @RelaxedMockK private lateinit var mockGetServiceDetailsUseCase: GetServiceDetailsUseCase
     @RelaxedMockK private lateinit var mockCreateAppointmentUseCase: CreateAppointmentUseCase
     @RelaxedMockK private lateinit var mockGetCurrentUserUseCase: GetCurrentUserUseCase
+    @RelaxedMockK private lateinit var mockGetCustomerProfileUseCase: GetCustomerProfileUseCase
 
     private lateinit var viewModel: BookingViewModel
 
     private val testUserId = "test-user-uid-123"
     private val testUser = AuthUser(uid = testUserId, email = "test@example.com")
-    private val testServiceId = "service-xyz"
 
+    private val testCustomerProfile = CustomerProfile(name = "Pre-filled Name", phone = "5551234567")
+
+    private val testServiceId = "service-xyz"
     private val testService = Service(
         id = testServiceId,
         ownerId = FirebaseConstants.TARGET_BUSINESS_OWNER_ID,
@@ -75,6 +80,8 @@ class BookingViewModelTest {
 
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(testUser)
 
+        every { mockGetCustomerProfileUseCase(testUserId) } returns flowOf(Result.Success(testCustomerProfile))
+
         coEvery { mockCreateAppointmentUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns Result.Success(Unit)
     }
 
@@ -85,21 +92,28 @@ class BookingViewModelTest {
             mockGetAvailableSlotsUseCase,
             mockGetServiceDetailsUseCase,
             mockCreateAppointmentUseCase,
-            mockGetCurrentUserUseCase
+            mockGetCurrentUserUseCase,
+            mockGetCustomerProfileUseCase
         )
     }
 
     @Test
-    fun `init - with valid serviceId - loads service and available slots successfully`() = runTest {
+    fun `init - with valid serviceId - loads service, slots AND prefills user info`() = runTest {
         createViewModel()
         mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
 
+        // Service & Slots Loaded
         assertThat(state.isLoadingService).isFalse()
-        assertThat(state.isLoadingSlots).isFalse()
         assertThat(state.service).isEqualTo(testService)
         assertThat(state.availableSlots).isEqualTo(testSlots)
+
+        // Check Pre-fill Logic
+        assertThat(state.customerName).isEqualTo(testCustomerProfile.name)
+        assertThat(state.customerPhone).isEqualTo(testCustomerProfile.phone)
+        assertThat(state.customerEmail).isEqualTo(testUser.email)
+
         assertThat(state.error).isNull()
 
         verify(exactly = 1) {

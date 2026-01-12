@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ComposeBooking"
+rootProject.name = "AppointFlow"
 include(":app")

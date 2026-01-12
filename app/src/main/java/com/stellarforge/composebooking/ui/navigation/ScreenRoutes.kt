@@ -33,6 +33,8 @@ sealed class ScreenRoutes(val route: String) {
     // Renamed from 'Profile' to 'CustomerProfile' for clarity vs 'BusinessProfile'
     object CustomerProfile : ScreenRoutes("customer_profile_screen")
 
+    object EditCustomerProfile : ScreenRoutes("edit_customer_profile")
+
     // Route with MANDATORY argument (Path Parameter)
     object BookingScreen : ScreenRoutes("booking_screen/{${RouteArgs.SERVICE_ID}}") {
         fun createRoute(serviceId: String) = "booking_screen/$serviceId"

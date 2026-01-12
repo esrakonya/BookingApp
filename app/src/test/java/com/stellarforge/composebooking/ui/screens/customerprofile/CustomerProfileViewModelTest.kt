@@ -5,8 +5,10 @@ import com.google.common.truth.Truth.assertThat
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.data.model.BusinessProfile
+import com.stellarforge.composebooking.data.model.CustomerProfile
 import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
+import com.stellarforge.composebooking.domain.usecase.GetCustomerProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.MainDispatcherRule
@@ -47,15 +49,20 @@ class CustomerProfileViewModelTest {
     @RelaxedMockK
     private lateinit var mockGetBusinessProfileUseCase: GetBusinessProfileUseCase
 
+    @RelaxedMockK
+    private lateinit var mockGetCustomerProfileUseCase: GetCustomerProfileUseCase
+
     private lateinit var viewModel: CustomerProfileViewModel
 
     private val testUser = AuthUser("uid_123", "musteri@test.com")
+    private val testCustomerProfile = CustomerProfile(id = "uid_123", name="Customer Test", phone = "555")
     private val testBusinessProfile = BusinessProfile(businessName = "Test Barber", contactPhone = "123")
 
     private fun createViewModel() {
         viewModel = CustomerProfileViewModel(
             mockSignOutUseCase,
             mockGetCurrentUserUseCase,
+            mockGetCustomerProfileUseCase,
             mockGetBusinessProfileUseCase
         )
     }
@@ -63,7 +70,13 @@ class CustomerProfileViewModelTest {
     @Test
     fun `init - loads user and business profile successfully`() = runTest {
         // ARRANGE
+        // 1. Auth returns success
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(testUser)
+
+        // 2. Profile Stream returns success with data
+        every { mockGetCustomerProfileUseCase("uid_123") } returns flowOf(Result.Success(testCustomerProfile))
+
+        // 3. Business Profile returns success
         every { mockGetBusinessProfileUseCase(FirebaseConstants.TARGET_BUSINESS_OWNER_ID) } returns flowOf(Result.Success(testBusinessProfile))
 
         // ACT
@@ -73,21 +86,27 @@ class CustomerProfileViewModelTest {
         // ASSERT
         val state = viewModel.uiState.value
 
+        // Check Loading
         assertThat(state.isLoading).isFalse()
+
+        // Check Auth Data
         assertThat(state.userEmail).isEqualTo("musteri@test.com")
 
-        // According to ViewModel logic, username is parsed from email (before @)
-        assertThat(state.userName).isEqualTo("musteri")
+        // Check Firestore Data (Real-time name)
+        // ViewModel logic now takes the name from Firestore Profile if available
+        assertThat(state.userName).isEqualTo("Customer Test")
 
+        // Check Business Info
         assertThat(state.businessProfile).isEqualTo(testBusinessProfile)
         assertThat(state.errorMessageId).isNull()
     }
 
     @Test
-    fun `init - when user not found - shows error message`() = runTest {
+    fun `init - when user not found (Auth Error) - shows error message`() = runTest {
         // ARRANGE
         coEvery { mockGetCurrentUserUseCase() } returns Result.Success(null)
-        every { mockGetBusinessProfileUseCase(any()) } returns flowOf(Result.Success(null))
+        // If auth fails, profile stream is never called, so we don't strictly need to mock it here,
+        // but relaxing mocks handles it safely.
 
         // ACT
         createViewModel()

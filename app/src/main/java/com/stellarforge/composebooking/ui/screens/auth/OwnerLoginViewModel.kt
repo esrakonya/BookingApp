@@ -1,6 +1,5 @@
 package com.stellarforge.composebooking.ui.screens.auth
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException

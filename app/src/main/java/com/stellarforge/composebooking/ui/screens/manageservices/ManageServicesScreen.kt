@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,8 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.data.model.Service
+import com.stellarforge.composebooking.ui.components.AppAlertDialog
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
 import com.stellarforge.composebooking.ui.components.AppSnackbarHost
+import com.stellarforge.composebooking.ui.components.AppTopBar
 import com.stellarforge.composebooking.ui.components.EmptyState
 import com.stellarforge.composebooking.ui.components.ErrorState
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
@@ -51,6 +54,8 @@ fun ManageServicesScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    var serviceToDelete by remember { mutableStateOf<Service?>(null) }
+
     // Error Handling Logic:
     // If there is data on the screen, show errors via Snackbar (e.g., delete failed).
     // If there is NO data, the 'when' block below handles the full-screen ErrorState.
@@ -59,7 +64,7 @@ fun ManageServicesScreen(
             scope.launch {
                 snackbarHostState.showSnackbar(
                     message = context.getString(uiState.errorResId!!),
-                    actionLabel = "error", // Triggers Red color in AppSnackbar
+                    actionLabel = "error",
                     duration = SnackbarDuration.Short
                 )
                 viewModel.clearError()
@@ -69,16 +74,9 @@ fun ManageServicesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(id = R.string.manage_services_screen_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(id = R.string.action_navigate_back)
-                        )
-                    }
-                }
+            AppTopBar(
+                title = stringResource(id = R.string.manage_services_screen_title),
+                canNavigateBack = false
             )
         },
         floatingActionButton = {
@@ -137,7 +135,7 @@ fun ManageServicesScreen(
                             OwnerServiceListItem(
                                 service = service,
                                 onEditClick = { onEditService(service.id) },
-                                onDeleteClick = { viewModel.deleteService(service.id) },
+                                onDeleteClick = { serviceToDelete = service },
                                 // Show spinner ONLY on the item being deleted
                                 isBeingDeleted = service.id == uiState.isDeletingServiceId
                             )
@@ -149,6 +147,24 @@ fun ManageServicesScreen(
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
                     }
                 }
+            }
+
+            if (serviceToDelete != null) {
+                val service = serviceToDelete!!
+
+                AppAlertDialog(
+                    onDismissRequest = { serviceToDelete = null },
+                    onConfirm = {
+                        viewModel.deleteService(service.id)
+                        serviceToDelete = null
+                    },
+                    title = stringResource(R.string.dialog_delete_service_title),
+                    description = stringResource(R.string.dialog_delete_service_confirm, service.name),
+                    icon = Icons.Default.DeleteForever,
+                    confirmText = stringResource(R.string.action_delete),
+                    dismissText = stringResource(R.string.action_cancel),
+                    isDestructive = true
+                )
             }
         }
     }

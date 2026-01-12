@@ -54,6 +54,12 @@ abstract class DataModule {
         impl: ServiceRemoteDataSourceImpl
     ): ServiceRemoteDataSource
 
+    @Binds
+    @Singleton
+    abstract fun bindCustomerProfileRemoteDataSource(
+        impl: CustomerProfileRemoteDataSourceImpl
+    ): CustomerProfileRemoteDataSource
+
     // =================================================================
     // Repositories (Domain Level)
     // =================================================================
@@ -87,4 +93,10 @@ abstract class DataModule {
     abstract fun bindServiceRepository(
         impl: ServiceRepositoryImpl
     ): ServiceRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCustomerProfileRepository(
+        impl: CustomerProfileRepositoryImpl
+    ): CustomerProfileRepository
 }

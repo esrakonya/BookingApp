@@ -9,6 +9,7 @@ import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.domain.usecase.CreateAppointmentUseCase
 import com.stellarforge.composebooking.domain.usecase.GetAvailableSlotsUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
+import com.stellarforge.composebooking.domain.usecase.GetCustomerProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetServiceDetailsUseCase
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.Result
@@ -60,7 +61,8 @@ class BookingViewModel @Inject constructor(
     private val getAvailableSlotsUseCase: GetAvailableSlotsUseCase,
     private val getServiceDetailsUseCase: GetServiceDetailsUseCase,
     private val createAppointmentUseCase: CreateAppointmentUseCase,
-    private val getCurrentUserUseCase: GetCurrentUserUseCase
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val getCustomerProfileUseCase: GetCustomerProfileUseCase
 ) : ViewModel() {
 
     // Retrieve the service ID from navigation arguments (Mandatory)
@@ -75,6 +77,44 @@ class BookingViewModel @Inject constructor(
     init {
         Timber.d("BookingViewModel initialized with serviceId: $serviceId")
         loadServiceDetails()
+        prefillCustomerInfo()
+    }
+
+    /**
+     * Fetches the current user's profile (Name, Phone) from Firestore
+     * and auto-fills the booking form fields.
+     */
+    private fun prefillCustomerInfo() {
+        viewModelScope.launch {
+            // 1. Get User ID & Email from Auth
+            val userResult = getCurrentUserUseCase()
+            if (userResult is Result.Success && userResult.data != null) {
+                val authUser = userResult.data
+
+                // Set Email immediately (from Auth)
+                _uiState.update { it.copy(customerEmail = authUser.email ?: "") }
+                // 2. Fetch Profile Details (Name, Phone) from Firestore
+                // We use .first() to get the data ONCE. We don't want a live stream here
+                // because if the user starts typing, an update shouldn't overwrite their input.
+                try {
+                    val profileResult = getCustomerProfileUseCase(authUser.uid).first()
+
+                    if (profileResult is Result.Success) {
+                        val profile = profileResult.data
+                        _uiState.update { state ->
+                            state.copy(
+                                // Only pre-fill if the field is currently empty (safety check)
+                                customerName = if (state.customerName.isBlank()) profile.name ?: "" else state.customerName,
+                                customerPhone = if (state.customerPhone.isBlank()) profile.phone ?: "" else state.customerPhone,
+                                customerEmail = if (state.customerEmail.isBlank()) profile.email ?: "" else state.customerEmail
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to pre-fill user info")
+                }
+            }
+        }
     }
 
     private fun loadServiceDetails() {

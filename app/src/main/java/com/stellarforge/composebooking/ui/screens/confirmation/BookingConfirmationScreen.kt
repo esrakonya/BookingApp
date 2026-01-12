@@ -49,7 +49,7 @@ fun BookingConfirmationScreen(
 
             // Title
             Text(
-                text = stringResource(id = R.string.confirmation_title), // e.g. "Success!"
+                text = stringResource(id = R.string.confirmation_title),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onBackground

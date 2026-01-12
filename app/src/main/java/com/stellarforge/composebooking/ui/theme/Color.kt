@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
  */
 
 // --- BRAND COLORS (Primary Identity) ---
-val PrimaryBlue = Color(0xFF2C3E50)       // Deep Navy: Used for Main Buttons, Headers, Active States.
+val PrimaryBlue = Color(0xFF2C3E50)// Deep Navy: Used for Main Buttons, Headers, Active States.
 val OnPrimaryBlue = Color(0xFFFFFFFF)     // Text color on Primary components (White).
 val PrimaryContainerBlue = Color(0xFFD3DCE5) // Soft Blue-Grey: Used for selected items, light backgrounds.
 val OnPrimaryContainerBlue = Color(0xFF001E2F)// High-contrast text for Primary Container.

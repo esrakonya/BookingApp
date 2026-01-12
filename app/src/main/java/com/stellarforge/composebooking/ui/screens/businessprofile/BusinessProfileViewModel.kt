@@ -1,5 +1,6 @@
 package com.stellarforge.composebooking.ui.screens.businessprofile
 
+import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,7 @@ import com.stellarforge.composebooking.domain.usecase.GetBusinessProfileUseCase
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
 import com.stellarforge.composebooking.domain.usecase.UpdateBusinessProfileUseCase
+import com.stellarforge.composebooking.domain.usecase.UploadBusinessLogoUseCase
 import com.stellarforge.composebooking.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,7 +43,8 @@ class BusinessProfileViewModel @Inject constructor(
     private val getBusinessProfileUseCase: GetBusinessProfileUseCase,
     private val updateBusinessProfileUseCase: UpdateBusinessProfileUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
-    private val signOutUseCase: SignOutUseCase
+    private val signOutUseCase: SignOutUseCase,
+    private val uploadBusinessLogoUseCase: UploadBusinessLogoUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BusinessProfileUiState())
@@ -49,6 +52,9 @@ class BusinessProfileViewModel @Inject constructor(
 
     private val _eventFlow = MutableSharedFlow<BusinessProfileEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
+
+    private val _isUploadingLogo = MutableStateFlow(false)
+    val isUploadingLogo = _isUploadingLogo.asStateFlow()
 
     // Form Fields (Two-way binding)
     val businessName = MutableStateFlow("")
@@ -131,6 +137,31 @@ class BusinessProfileViewModel @Inject constructor(
         }
     }
 
+    fun onLogoSelected(uri: Uri) {
+        viewModelScope.launch {
+            val userResult = getCurrentUserUseCase()
+            val userId = (userResult as? Result.Success)?.data?.uid ?: return@launch
+
+            _isUploadingLogo.value = true
+
+            when (val result = uploadBusinessLogoUseCase(uri, userId)) {
+                is Result.Success -> {
+
+                    logoUrl.value = result.data
+                    _isUploadingLogo.value = false
+                    saveBusinessProfile()
+                }
+
+                is Result.Error -> {
+                    _isUploadingLogo.value = false
+                    _uiState.update { it.copy(updateErrorResId = R.string.error_generic_unknown) }
+                }
+
+                is Result.Loading -> {}
+            }
+        }
+    }
+
     private fun updateFormFieldsFromProfile(profile: BusinessProfile?) {
         profile?.let { loadedProfile ->
             businessName.value = loadedProfile.businessName
@@ -180,7 +211,7 @@ class BusinessProfileViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isUpdatingProfile = false,
-                    updateErrorResId = R.string.label_business_name_required // Or a specific error string
+                    updateErrorResId = R.string.label_business_name_required
                 )
             }
             return

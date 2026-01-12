@@ -2,7 +2,7 @@
     <!-- ============================================================= -->
     <!-- 1. APP IDENTITY & METADATA                                    -->
     <!-- ============================================================= -->
-    <string name="app_name">Booking App Template</string>
+    <string name="app_name">AppointFlow</string>
     <string name="app_version">Version 1.0.0</string>
     <string name="version_label">Version 1.0.0</string>
     <string name="copyright_text">© 2025 All Rights Reserved.</string>
@@ -182,6 +182,9 @@
     <string name="contact_no_phone">No phone number provided.</string>
     <string name="error_user_not_found">User information not found.</string>
 
+    <!-- Customer Edit Profile Screen -->
+    <string name="screen_title_edit_profile">Edit Profile</string>
+
     <!-- ============================================================= -->
     <!-- 5. OWNER SCREENS                                              -->
     <!-- ============================================================= -->
@@ -199,6 +202,8 @@
     <string name="manage_services_empty_state">You haven\'t added any services yet.\nTap the + button to add one.</string>
     <string name="error_services_loading_failed">Failed to load services.</string>
     <string name="error_service_deletion_failed">Failed to delete service.</string>
+    <string name="dialog_delete_service_title">Delete Service?</string>
+    <string name="dialog_delete_service_confirm">Are you sure you want to delete "%1$s"? This action cannot be undone.</string>
 
     <!-- Add/Edit Service Screen -->
     <string name="add_edit_service_screen_title_add">Add Service</string>
@@ -214,6 +219,7 @@
     <string name="error_service_not_found">Service not found.</string>
 
     <!-- Business Profile Screen -->
+    <string name="edit_logo">Edit Logo</string>
     <string name="screen_title_business_profile">Business Profile</string>
     <string name="header_basic_info">Basic Information</string>
     <string name="header_contact_info">Contact Information</string>
@@ -221,7 +227,6 @@
 
     <string name="label_business_name">Business Name *</string>
     <string name="label_business_name_required">Business Name is required.</string>
-    <string name="label_logo_url_optional">Logo URL (Optional)</string>
     <string name="label_contact_email">Contact Email</string>
     <string name="label_contact_phone">Contact Phone</string>
     <string name="label_address">Address</string>

@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
 import com.stellarforge.composebooking.ui.components.AppSnackbarHost
+import com.stellarforge.composebooking.ui.components.AppTopBar
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.ui.screens.booking.CalendarDay
 import com.stellarforge.composebooking.ui.components.EmptyState
@@ -48,22 +50,13 @@ fun ScheduleScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Note: Although we don't actively trigger snackbars in this screen yet,
-    // we keep the Host ready for future features (e.g., cancelling an appointment as Owner).
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(id = R.string.schedule_screen_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(id = R.string.action_navigate_back)
-                        )
-                    }
-                }
+            AppTopBar(
+                title = stringResource(id = R.string.schedule_screen_title),
+                canNavigateBack = false
             )
         },
         // CUSTOM SNACKBAR HOST
@@ -170,24 +163,92 @@ private fun AppointmentList(appointments: List<Appointment>) {
 
 @Composable
 private fun AppointmentListItem(appointment: Appointment) {
+    val isPast = appointment.appointmentDateTime.seconds < Timestamp.now().seconds
+
+    val cardContainerColor = if (isPast) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    val primaryTextColor = if (isPast) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val accentColor = if (isPast) {
+        MaterialTheme.colorScheme.outline
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
+    val statusIcon = if (isPast) Icons.Default.CheckCircle else Icons.Default.AccessTime
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isPast) 0.dp else 2.dp),
+        colors = CardDefaults.cardColors(containerColor = cardContainerColor)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = appointment.appointmentDateTime.toFormattedTime(),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(appointment.serviceName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(60.dp)
+            ) {
+                Icon(
+                    imageVector = statusIcon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp)
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(appointment.customerName, style = MaterialTheme.typography.bodyMedium)
-                appointment.customerPhone.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = appointment.appointmentDateTime.toFormattedTime(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            VerticalDivider(
+                modifier = Modifier.height(40.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = appointment.customerName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isPast) primaryTextColor else MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = appointment.serviceName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = primaryTextColor
+                )
+
+                if (appointment.customerPhone.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = appointment.customerPhone,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = primaryTextColor.copy(alpha = 0.8f)
+                    )
                 }
             }
         }

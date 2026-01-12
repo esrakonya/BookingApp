@@ -84,55 +84,69 @@ class GetAvailableSlotsUseCase @Inject constructor(
     ): List<LocalTime> {
         val availableTimeSlots = mutableListOf<LocalTime>()
 
-        // Business Rules
-        val openingTime = BusinessConstants.OPENING_TIME
-        val closingTime = BusinessConstants.CLOSING_TIME
-        val interval = BusinessConstants.SLOT_INTERVAL_MINUTES.toLong()
-        val minNoticeMinutes = BusinessConstants.MIN_BOOKING_NOTICE_MINUTES
+        // 1. Define Business Constraints
+        val openingTime = BusinessConstants.OPENING_TIME // e.g. 09:00
+        val closingTime = BusinessConstants.CLOSING_TIME // e.g. 18:00
+        val interval = BusinessConstants.SLOT_INTERVAL_MINUTES.toLong() // e.g. 15 min
 
-        // Time Constraints
+        // 2. Time Validation (Prevent past bookings)
         val now = LocalTime.now()
         val isToday = date == LocalDate.now()
 
-        // If today, enforce the "Buffer Time" rule (e.g., cannot book 5 mins from now)
-        val earliestBookingTime = if (isToday) now.plusMinutes(minNoticeMinutes.toLong()) else LocalTime.MIN
+        // Calculate buffer: e.g., Users can't book a slot starting in the next 30 mins
+        val bufferMinutes = BusinessConstants.MIN_BOOKING_NOTICE_MINUTES.toLong()
+        val earliestBookableTime = if (isToday) now.plusMinutes(bufferMinutes) else LocalTime.MIN
 
-        // Pre-process: Convert Firestore Timestamps to LocalTime for easier comparison
-        val bookedIntervals = bookedSlots.map {
-            val start = it.startTime.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalTime()
-            val end = it.endTime.toDate().toInstant().atZone(ZoneId.systemDefault()).toLocalTime()
-            start to end
-        }.sortedBy { it.first }
+        // 3. Pre-process Busy Intervals (Convert Firestore Timestamp -> LocalTime)
+        // We convert them once here to avoid repeated conversions inside the loop.
+        val zoneId = ZoneId.systemDefault()
+        val busyIntervals = bookedSlots.map { slot ->
+            val start = slot.startTime.toDate().toInstant().atZone(zoneId).toLocalTime()
+            val end = slot.endTime.toDate().toInstant().atZone(zoneId).toLocalTime()
+            start to end // Pair(Start, End)
+        }
 
-        var potentialStartTime = openingTime
+        // 4. Algorithm: Iterate from Opening Time to Closing Time
+        var currentSlotStart = openingTime
 
-        // Loop: Generate slots
-        while (potentialStartTime.plusMinutes(serviceDurationMinutes.toLong()) <= closingTime) {
+        // Ensure the service finishes before or exactly at closing time
+        while (currentSlotStart.plusMinutes(serviceDurationMinutes.toLong()) <= closingTime) {
 
-            // Rule 1: Check against "Past Time" or "Buffer Time"
-            if (isToday && potentialStartTime.isBefore(earliestBookingTime)) {
-                potentialStartTime = potentialStartTime.plusMinutes(interval)
+            // Rule A: Past Time Check
+            // Skip this slot if it's in the past or within the buffer zone
+            if (isToday && currentSlotStart.isBefore(earliestBookableTime)) {
+                currentSlotStart = currentSlotStart.plusMinutes(interval)
                 continue
             }
 
-            val potentialEndTime = potentialStartTime.plusMinutes(serviceDurationMinutes.toLong())
-            var isSlotAvailable = true
+            // Rule B: OVERLAP CHECK (Collision Detection)
+            // Calculate when the requested service would end
+            val currentSlotEnd = currentSlotStart.plusMinutes(serviceDurationMinutes.toLong())
 
-            // Rule 2: Check for Overlaps with existing bookings
-            for ((bookedStart, bookedEnd) in bookedIntervals) {
-                // Overlap Formula: (StartA < EndB) and (EndA > StartB)
-                if (potentialStartTime < bookedEnd && potentialEndTime > bookedStart) {
-                    isSlotAvailable = false
-                    break // Optimization: Stop checking other bookings if one conflict is found
+            var isOverlapping = false
+
+            for ((bookedStart, bookedEnd) in busyIntervals) {
+                // Overlap Formula:
+                // (NewStart < OldEnd) AND (NewEnd > OldStart)
+                //
+                // Example Scenario:
+                // Existing Booking: 15:00 - 15:45
+                // Requested Slot:   15:15 - 15:30 (e.g., Manicure)
+                // Logic: 15:15 < 15:45 (True) AND 15:30 > 15:00 (True) -> COLLISION!
+
+                if (currentSlotStart.isBefore(bookedEnd) && currentSlotEnd.isAfter(bookedStart)) {
+                    isOverlapping = true
+                    break // Optimization: Stop checking if one collision is found
                 }
             }
 
-            if (isSlotAvailable) {
-                availableTimeSlots.add(potentialStartTime)
+            // If no collision, this slot is available
+            if (!isOverlapping) {
+                availableTimeSlots.add(currentSlotStart)
             }
 
-            // Move to next interval (e.g., 09:00 -> 09:15)
-            potentialStartTime = potentialStartTime.plusMinutes(interval)
+            // Move to the next interval (e.g., 09:00 -> 09:15)
+            currentSlotStart = currentSlotStart.plusMinutes(interval)
         }
 
         return availableTimeSlots

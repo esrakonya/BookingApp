@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -35,6 +33,7 @@ import com.kizitonwose.calendar.core.daysOfWeek
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.ui.components.AppSnackbarHost
+import com.stellarforge.composebooking.ui.components.AppTopBar
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation
 import com.stellarforge.composebooking.utils.toFormattedPrice
@@ -92,23 +91,11 @@ fun BookingScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = uiState.service?.let { stringResource(R.string.booking_screen_title_with_service, it.name) }
-                            ?: stringResource(id = R.string.booking_screen_title),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(id = R.string.action_navigate_back)
-                        )
-                    }
-                }
+            AppTopBar(
+                title = uiState.service?.let { stringResource(R.string.booking_screen_title_with_service, it.name) }
+                    ?: stringResource(id = R.string.booking_screen_title),
+                canNavigateBack = true,
+                navigateUp = { navController.popBackStack() }
             )
         },
         // CUSTOM SNACKBAR HOST
@@ -348,7 +335,10 @@ private fun CustomerInfoSection(
             )
             OutlinedTextField(
                 value = uiState.customerPhone,
-                onValueChange = onPhoneChanged,
+                onValueChange = { input ->
+                    val cleaned = input.filter { it.isDigit() }.take(10)
+                    onPhoneChanged(cleaned)
+                },
                 label = { Text(stringResource(id = R.string.booking_screen_phone_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,

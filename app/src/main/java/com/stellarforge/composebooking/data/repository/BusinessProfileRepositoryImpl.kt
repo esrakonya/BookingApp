@@ -1,5 +1,6 @@
 package com.stellarforge.composebooking.data.repository
 
+import android.net.Uri
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.snapshots
@@ -21,17 +22,12 @@ import javax.inject.Inject
 /**
  * Concrete implementation of [BusinessProfileRepository].
  *
- * This repository handles the data flow for the Business Profile (Storefront).
- *
- * **Key Features:**
- * - **Reactive Streams:** Uses Firestore `snapshots()` to provide a live [Flow].
- *   If the owner updates the shop name, all customers see the change instantly.
- * - **Error Handling:** Wraps Firestore exceptions into our custom [Result] type.
- * - **Dispatcher Safety:** Ensures heavy mapping operations run on the IO thread.
+ * Handles data flow between Firestore/Storage and the Domain layer.
+ * Ensures all heavy operations are offloaded to the [IoDispatcher].
  */
 class BusinessProfileRepositoryImpl @Inject constructor(
     private val remoteDataSource: BusinessProfileRemoteDataSource,
-    private val firestore: FirebaseFirestore, // Used directly for the snapshot stream
+    private val firestore: FirebaseFirestore,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : BusinessProfileRepository {
 
@@ -52,7 +48,6 @@ class BusinessProfileRepositoryImpl @Inject constructor(
                     try {
                         val profile = documentSnapshot.toObject(BusinessProfile::class.java)
                         if (profile != null) {
-                            // Timber.d("Repository: Profile update received: ${profile.businessName}")
                             Result.Success(profile)
                         } else {
                             Timber.w("Repository: Document exists but parsing returned null.")
@@ -90,6 +85,14 @@ class BusinessProfileRepositoryImpl @Inject constructor(
         Timber.d("Repository: Updating profile...")
         return withContext(ioDispatcher) {
             remoteDataSource.updateBusinessProfile(ownerUserId, profile)
+        }
+    }
+
+    override suspend fun uploadLogo(uri: Uri, ownerId: String): Result<String> {
+        return withContext(ioDispatcher) {
+            Timber.d("Repository: Uploading logo for $ownerId")
+            // Delegates the heavy upload task to RemoteDataSource
+            remoteDataSource.uploadLogo(uri, ownerId)
         }
     }
 }

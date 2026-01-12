@@ -94,7 +94,7 @@ class OwnerSignUpViewModel @Inject constructor(
         // 3. Confirm Password Validation
         val newConfirmPasswordError: Int? = if (state.confirmPassword.isBlank()) {
             isValid = false
-            R.string.error_password_empty // Reusing password empty error
+            R.string.error_password_empty
         } else if (state.password != state.confirmPassword) {
             isValid = false
             R.string.error_password_mismatch

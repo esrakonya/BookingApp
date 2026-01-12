@@ -1,18 +1,22 @@
 package com.stellarforge.composebooking.ui.screens.businessprofile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -23,10 +27,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.ui.components.AppAlertDialog
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
 import com.stellarforge.composebooking.ui.components.AppSnackbarHost
+import com.stellarforge.composebooking.ui.components.AppTopBar
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
+import com.stellarforge.composebooking.ui.components.NetworkLogoImage
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
+import com.stellarforge.composebooking.utils.PhoneNumberVisualTransformation
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -54,6 +62,7 @@ fun BusinessProfileScreen(
     val contactPhone by viewModel.contactPhone.collectAsState()
     val address by viewModel.address.collectAsState()
     val logoUrl by viewModel.logoUrl.collectAsState()
+    val isUploadingLogo by viewModel.isUploadingLogo.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -61,6 +70,15 @@ fun BusinessProfileScreen(
 
     // Dialog State
     var showSignOutDialog by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                viewModel.onLogoSelected(uri)
+            }
+        }
+    )
 
     // Handle One-time Events (Navigation)
     LaunchedEffect(key1 = true) {
@@ -98,8 +116,8 @@ fun BusinessProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(id = R.string.screen_title_business_profile)) },
+            AppTopBar(
+                title = stringResource(id = R.string.screen_title_business_profile),
                 actions = {
                     IconButton(onClick = { showSignOutDialog = true }) {
                         Icon(
@@ -134,10 +152,28 @@ fun BusinessProfileScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
+                        .padding(24.dp)
                         .imePadding(), // Adjust for keyboard
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Box(
+                        modifier = Modifier.clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
+                    ) {
+                        BusinessProfileHeader(logoUrl = logoUrl)
+
+                        if (isUploadingLogo) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.align(Alignment.Center),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
                     // 1. Basic Info
                     SectionCard(
                         title = stringResource(R.string.header_basic_info),
@@ -150,20 +186,7 @@ fun BusinessProfileScreen(
                             label = { Text(stringResource(R.string.label_business_name_required)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
-                            isError = uiState.updateErrorResId == R.string.label_business_name_required // Simple validation highlight
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = logoUrl,
-                            onValueChange = viewModel::onLogoUrlChanged,
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(stringResource(R.string.label_logo_url_optional)) },
-                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions.Default.copy(
-                                keyboardType = KeyboardType.Uri,
-                                imeAction = ImeAction.Next
-                            ),
+                            isError = uiState.updateErrorResId == R.string.label_business_name_required
                         )
                     }
 
@@ -187,15 +210,19 @@ fun BusinessProfileScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         OutlinedTextField(
                             value = contactPhone,
-                            onValueChange = viewModel::onContactPhoneChanged,
+                            onValueChange = { input ->
+                                val cleaned = input.filter { it.isDigit() }.take(10)
+                                viewModel.onContactPhoneChanged(cleaned)
+                            },
                             label = { Text(stringResource(R.string.label_contact_phone)) },
                             modifier = Modifier.fillMaxWidth(),
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                             keyboardOptions = KeyboardOptions.Default.copy(
-                                keyboardType = KeyboardType.Phone,
+                                keyboardType = KeyboardType.Number,
                                 imeAction = ImeAction.Next
                             ),
-                            singleLine = true
+                            singleLine = true,
+                            visualTransformation = PhoneNumberVisualTransformation()
                         )
                     }
 
@@ -214,7 +241,7 @@ fun BusinessProfileScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // 4. Save Button
                     Button(
@@ -224,6 +251,7 @@ fun BusinessProfileScreen(
                             .height(56.dp),
                         shape = MaterialTheme.shapes.medium,
                         enabled = !uiState.isUpdatingProfile, // Disable while saving
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
@@ -235,7 +263,7 @@ fun BusinessProfileScreen(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(stringResource(R.string.loading)) // "Loading..."
+                            Text(stringResource(R.string.loading))
                         } else {
                             Icon(Icons.Default.Save, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -255,25 +283,15 @@ fun BusinessProfileScreen(
 
     // Sign Out Confirmation Dialog
     if (showSignOutDialog) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { showSignOutDialog = false },
-            title = { Text(stringResource(R.string.dialog_sign_out_title)) },
-            text = { Text(stringResource(R.string.dialog_sign_out_confirmation)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSignOutDialog = false
-                        viewModel.signOut()
-                    }
-                ) {
-                    Text(stringResource(R.string.profile_sign_out))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
+            onConfirm = { viewModel.signOut() },
+            title = stringResource(R.string.dialog_sign_out_title),
+            description = stringResource(R.string.dialog_sign_out_confirmation),
+            icon = Icons.AutoMirrored.Filled.ExitToApp,
+            confirmText = stringResource(R.string.profile_sign_out),
+            dismissText = stringResource(R.string.action_cancel),
+            isDestructive = true
         )
     }
 }
@@ -313,6 +331,45 @@ fun SectionCard(
                 )
             }
             content()
+        }
+    }
+}
+
+@Composable
+fun BusinessProfileHeader(logoUrl: String) {
+    Box(contentAlignment = Alignment.BottomEnd) {
+        Surface(
+            modifier = Modifier
+                .size(120.dp)
+                .border(4.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 4.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                NetworkLogoImage(
+                    url = logoUrl,
+                    size = 120.dp
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .size(32.dp)
+                .offset(x = 0.dp, y = 4.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.background)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.edit_logo),
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.stellarforge.composebooking.data.remote
 
+import android.net.Uri
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.Result
@@ -19,7 +21,8 @@ import javax.inject.Inject
  * 1-to-1 relationship between an Owner Account and a Business Profile.
  */
 class BusinessProfileRemoteDataSourceImpl @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val storage: FirebaseStorage
 ) : BusinessProfileRemoteDataSource {
     override suspend fun updateBusinessProfile(
         ownerUserId: String,
@@ -39,6 +42,20 @@ class BusinessProfileRemoteDataSourceImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "DataSource: Error updating business profile for ownerId: $ownerUserId")
             Result.Error(e, "Failed to update business profile: ${e.localizedMessage}")
+        }
+    }
+
+    override suspend fun uploadLogo(uri: Uri, ownerId: String): Result<String> {
+        return try {
+            val storageRef = storage.reference.child("business_logos/$ownerId.jpg")
+
+            storageRef.putFile(uri).await()
+
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+
+            Result.Success(downloadUrl)
+        } catch (e: Exception) {
+            Result.Error(e, "Image upload failed.")
         }
     }
 

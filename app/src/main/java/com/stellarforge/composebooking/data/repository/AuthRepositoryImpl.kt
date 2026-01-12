@@ -5,6 +5,7 @@ import com.stellarforge.composebooking.data.remote.AuthRemoteDataSource
 import com.stellarforge.composebooking.utils.Result
 import com.stellarforge.composebooking.di.IoDispatcher
 import com.stellarforge.composebooking.domain.repository.AuthRepository
+import com.stellarforge.composebooking.utils.UserPrefs
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -20,7 +21,8 @@ import javax.inject.Inject
  */
 class AuthRepositoryImpl @Inject constructor(
     private val authRemoteDataSource: AuthRemoteDataSource,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val userPrefs: UserPrefs
 ) : AuthRepository {
 
     /**
@@ -38,7 +40,11 @@ class AuthRepositoryImpl @Inject constructor(
         password: String
     ): Result<AuthUser> {
         return withContext(ioDispatcher) {
-            authRemoteDataSource.signInWithEmailPassword(email, password)
+            val result = authRemoteDataSource.signInWithEmailPassword(email, password)
+            if (result is Result.Success) {
+                userPrefs.saveUserRole(result.data.role)
+            }
+            result
         }
     }
 
@@ -53,12 +59,17 @@ class AuthRepositoryImpl @Inject constructor(
         role: String
     ): Result<AuthUser> {
         return withContext(ioDispatcher) {
-            authRemoteDataSource.signUpWithEmailPassword(email, password, role)
+            val result = authRemoteDataSource.signUpWithEmailPassword(email, password, role)
+            if (result is Result.Success) {
+                userPrefs.saveUserRole(result.data.role)
+            }
+            result
         }
     }
 
     override suspend fun signOut(): Result<Unit> {
         return withContext(ioDispatcher) {
+            userPrefs.clear()
             authRemoteDataSource.signOut()
         }
     }

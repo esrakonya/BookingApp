@@ -7,6 +7,7 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.stellarforge.composebooking.R
+import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.data.model.Service
 import com.stellarforge.composebooking.domain.repository.AppointmentRepository
 import com.stellarforge.composebooking.domain.repository.ServiceRepository
@@ -16,7 +17,6 @@ import com.stellarforge.composebooking.domain.usecase.SignOutUseCase
 import com.stellarforge.composebooking.utils.FirebaseConstants
 import com.stellarforge.composebooking.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -49,7 +49,6 @@ sealed interface ServiceListUiState {
  * - **Session Management:** Handles the Sign-Out process.
  */
 @HiltViewModel
-@OptIn(ExperimentalCoroutinesApi::class)
 class ServiceListViewModel @Inject constructor(
     private val appointmentRepository: AppointmentRepository, // Kept for future booking features
     private val serviceRepository: ServiceRepository,
@@ -60,6 +59,9 @@ class ServiceListViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<ServiceListUiState>(ServiceListUiState.Loading)
     val uiState: StateFlow<ServiceListUiState> = _uiState.asStateFlow()
+
+    private val _businessProfile = MutableStateFlow<BusinessProfile?>(null)
+    val businessProfile: StateFlow<BusinessProfile?> = _businessProfile.asStateFlow()
 
     // Holds the Business Name to be displayed in the TopBar
     private val _businessName = MutableStateFlow<String?>(null)
@@ -112,7 +114,7 @@ class ServiceListViewModel @Inject constructor(
     private suspend fun loadBusinessProfile(targetOwnerId: String) {
         getBusinessProfileUseCase(targetOwnerId).collect { result ->
             if (result is Result.Success) {
-                _businessName.value = result.data?.businessName
+               _businessProfile.value = result.data
             } else if (result is Result.Error) {
                 Timber.e("Failed to load business profile. Default title will be used.")
             }

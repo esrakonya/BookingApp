@@ -1,8 +1,6 @@
 package com.stellarforge.composebooking.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -19,12 +17,10 @@ import com.stellarforge.composebooking.ui.screens.booking.BookingScreen
 import com.stellarforge.composebooking.ui.screens.businessprofile.BusinessProfileScreen
 import com.stellarforge.composebooking.ui.screens.manageservices.ManageServicesScreen
 import com.stellarforge.composebooking.ui.screens.mybookings.MyBookingsScreen
-import com.stellarforge.composebooking.ui.screens.customerprofile.CustomerProfileEvent
 import com.stellarforge.composebooking.ui.screens.customerprofile.CustomerProfileScreen
-import com.stellarforge.composebooking.ui.screens.customerprofile.CustomerProfileViewModel
+import com.stellarforge.composebooking.ui.screens.customerprofile.edit.EditCustomerProfileScreen
 import com.stellarforge.composebooking.ui.screens.schedule.ScheduleScreen
 import com.stellarforge.composebooking.ui.screens.splash.SplashScreen
-import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Main Navigation Graph for the application.
@@ -164,6 +160,11 @@ fun AppNavigation(navController: NavHostController) {
         // Customer Profile & Settings
         composable(ScreenRoutes.CustomerProfile.route) {
             CustomerProfileScreen(navController = navController)
+        }
+
+        // Edit Customer Profile
+        composable(route = ScreenRoutes.EditCustomerProfile.route) {
+            EditCustomerProfileScreen(navController = navController)
         }
     }
 }

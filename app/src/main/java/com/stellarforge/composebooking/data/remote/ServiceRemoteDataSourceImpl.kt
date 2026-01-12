@@ -60,6 +60,7 @@ class ServiceRemoteDataSourceImpl @Inject constructor(
      */
     override fun getCustomerServicesStream(): Flow<Result<List<Service>>> = callbackFlow {
         val listener = serviceCollection
+            .whereEqualTo("ownerId", FirebaseConstants.TARGET_BUSINESS_OWNER_ID)
             .whereEqualTo("isActive", true) // Only show active services to customers
             .orderBy("name", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->

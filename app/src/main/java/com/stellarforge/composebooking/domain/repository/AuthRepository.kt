@@ -2,6 +2,7 @@ package com.stellarforge.composebooking.domain.repository
 
 import com.stellarforge.composebooking.data.model.AuthUser
 import com.stellarforge.composebooking.utils.Result
+import kotlinx.coroutines.withContext
 
 /**
  * Defines the contract for Authentication and User Session management within the Domain layer.

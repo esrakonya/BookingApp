@@ -1,5 +1,6 @@
 package com.stellarforge.composebooking.data.remote
 
+import android.net.Uri
 import com.stellarforge.composebooking.data.model.BusinessProfile
 import com.stellarforge.composebooking.utils.Result
 
@@ -23,4 +24,6 @@ interface BusinessProfileRemoteDataSource {
      * @param profile The [BusinessProfile] data object containing the new details.
      */
     suspend fun updateBusinessProfile(ownerUserId: String, profile: BusinessProfile): Result<Unit>
+
+    suspend fun uploadLogo(uri: Uri, ownerId: String): Result<String>
 }

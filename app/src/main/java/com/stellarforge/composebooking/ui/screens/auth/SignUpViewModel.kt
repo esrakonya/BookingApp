@@ -112,7 +112,7 @@ class SignUpViewModel @Inject constructor(
         // 3. Confirm Password Validation
         val newConfirmPasswordError: Int? = if (state.confirmPassword.isBlank()) {
             isValid = false
-            R.string.error_password_empty // Reuse password empty string
+            R.string.error_password_empty
         } else if (state.password != state.confirmPassword) {
             isValid = false
             R.string.error_password_mismatch
@@ -153,9 +153,9 @@ class SignUpViewModel @Inject constructor(
                     Timber.w(result.exception, "Sign up failed. Message: ${result.message}")
                     val errorRes = when (result.exception) {
                         is FirebaseNetworkException -> R.string.error_network_connection
-                        is FirebaseAuthUserCollisionException -> R.string.error_auth_email_collision // Email already in use
-                        is FirebaseAuthWeakPasswordException -> R.string.error_auth_weak_password // Password too weak
-                        is IllegalArgumentException -> R.string.error_auth_generic_signup // UseCase validation error
+                        is FirebaseAuthUserCollisionException -> R.string.error_auth_email_collision
+                        is FirebaseAuthWeakPasswordException -> R.string.error_auth_weak_password
+                        is IllegalArgumentException -> R.string.error_auth_generic_signup
                         else -> R.string.error_signup_failed
                     }
                     _uiState.update { it.copy(isLoading = false, generalErrorRes = errorRes) }

@@ -74,17 +74,17 @@ fun OwnerLoginScreen(
         snackbarHostState = snackbarHostState,
 
         // --- Owner Specific Header ---
-        title = stringResource(R.string.owner_login_title), // "Business Login"
-        subtitle = stringResource(R.string.owner_login_subtitle), // "Manage your business efficiently."
+        title = stringResource(R.string.owner_login_title),
+        subtitle = stringResource(R.string.owner_login_subtitle),
 
         // --- Footer Actions ---
 
         // Primary: Navigate to Owner Registration
-        primaryFooterText = stringResource(R.string.signup_owner_link), // "Create Business Account"
+        primaryFooterText = stringResource(R.string.signup_owner_link),
         onPrimaryFooterClick = { navController.navigate(ScreenRoutes.OwnerSignUp.route) },
 
         // Secondary: Return to Customer Login (Role Switch)
-        secondaryFooterText = stringResource(R.string.login_back_to_customer), // "Back to Customer Login"
+        secondaryFooterText = stringResource(R.string.login_back_to_customer),
         onSecondaryFooterClick = { navController.popBackStack() },
 
         // Back button enabled to easily return to main entrance

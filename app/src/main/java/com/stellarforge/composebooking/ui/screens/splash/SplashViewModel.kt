@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.stellarforge.composebooking.domain.usecase.GetCurrentUserUseCase
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
 import com.stellarforge.composebooking.utils.Result
+import com.stellarforge.composebooking.utils.UserPrefs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +25,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val getCurrentUserUseCase: GetCurrentUserUseCase
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val userPrefs: UserPrefs
 ) : ViewModel() {
 
     // Holds the navigation target. Null means "Still Loading".
@@ -37,20 +39,40 @@ class SplashViewModel @Inject constructor(
 
     private fun initializeSplashScreen() {
         viewModelScope.launch {
-            // 1. Minimum delay for branding visibility (2 seconds)
-            // Ensures the user sees the logo even if the auth check is instant.
-            val minSplashTime = System.currentTimeMillis() + 2000
+            // 1. Minimum Branding Duration
+            // We force the splash screen to stay visible for at least 1000ms (1 second).
+            // This prevents the screen from flickering too fast on high-end devices
+            // and ensures the user perceives the brand logo.
+            val minSplashTime = System.currentTimeMillis() + 1000
 
-            // 2. Verify User Session
-            val destination = checkUserStatus()
+            // 2. Determine Navigation Destination
+            // STRATEGY: Offline-First / Caching (Best Practice)
+            // Instead of waiting for a network call to Firestore (which might be slow),
+            // we first check the local storage (SharedPreferences).
+            val cachedRole = userPrefs.getUserRole()
 
-            // 3. Wait for the remaining time if logic finished too fast
+            val destination = if (cachedRole != null) {
+                // CACHE HIT: We know the role immediately.
+                // This ensures instant app launch even without internet connection.
+                if (cachedRole == "owner") {
+                    ScreenRoutes.Schedule.route
+                } else {
+                    ScreenRoutes.ServiceList.route
+                }
+            } else {
+                // CACHE MISS: First time install or data cleared.
+                // Fallback to Network Check (slower but necessary for initial setup).
+                checkUserStatus()
+            }
+
+            // 3. Handle Animation Timing
+            // Calculate remaining time to meet the minimum duration requirement.
             val delayTime = minSplashTime - System.currentTimeMillis()
             if (delayTime > 0) {
                 delay(delayTime)
             }
 
-            // 4. Set navigation destination (Triggers UI navigation)
+            // 4. Navigate
             _startDestination.value = destination
         }
     }

@@ -20,12 +20,14 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.ui.navigation.ScreenRoutes
+import com.stellarforge.composebooking.ui.theme.PrimaryBlue
 
 /**
  * The initial Splash Screen displayed upon app launch.
@@ -81,7 +83,9 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color = MaterialTheme.colorScheme.primary), // Must match themes.xml windowBackground
+            .background(color = PrimaryBlue) // Must match themes.xml windowBackground
+            .systemBarsPadding()
+            .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -115,10 +119,12 @@ fun SplashScreen(
             // --- APP NAME ---
             Text(
                 text = stringResource(id = R.string.app_name),
-                style = MaterialTheme.typography.displaySmall,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                letterSpacing = 1.sp // Adds a modern, airy feel to the text
+                letterSpacing = 1.sp, // Adds a modern, airy feel to the text
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
         }
 
@@ -129,7 +135,7 @@ fun SplashScreen(
             color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 16.dp),
             style = MaterialTheme.typography.labelMedium
         )
     }

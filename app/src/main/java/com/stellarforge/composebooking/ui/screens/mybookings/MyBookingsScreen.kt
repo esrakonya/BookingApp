@@ -3,8 +3,6 @@ package com.stellarforge.composebooking.ui.screens.mybookings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +19,7 @@ import com.stellarforge.composebooking.R
 import com.stellarforge.composebooking.data.model.Appointment
 import com.stellarforge.composebooking.ui.components.AppBottomNavigationBar
 import com.stellarforge.composebooking.ui.components.AppSnackbarHost
+import com.stellarforge.composebooking.ui.components.AppTopBar
 import com.stellarforge.composebooking.ui.components.LoadingIndicator
 import com.stellarforge.composebooking.utils.toFormattedPrice
 import kotlinx.coroutines.flow.collectLatest
@@ -74,13 +73,9 @@ fun MyBookingsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(id = R.string.my_bookings_screen_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(id = R.string.action_navigate_back))
-                    }
-                }
+            AppTopBar(
+                title = stringResource(id = R.string.my_bookings_screen_title),
+                canNavigateBack = false
             )
         },
         // CUSTOM SNACKBAR HOST
